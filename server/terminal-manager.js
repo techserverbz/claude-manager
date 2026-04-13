@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
+import { SessionTailer } from "./session-tailer.js";
 
 const CHRISTOPHER_HOME = path.join(process.env.USERPROFILE || process.env.HOME, ".claude", "christopher");
 
@@ -196,48 +197,49 @@ export class TerminalManager {
       pid: ptyProcess.pid,
       config,
       outputBuffer: "",
-      responseBuffer: "",
-      userInputBuffer: "",
-      waitingForResponse: false,
-      promptTimer: null,
+      sessionTailer: null,
     };
 
-    // Stream output + detect responses for TTS + save messages
+    // Stream raw output to frontend (xterm display)
+    const MAX_BUFFER = 50000; // keep last 50KB of output
     ptyProcess.onData((data) => {
       terminal.outputBuffer += data;
-      if (onOutput) onOutput(data);
-
-      // Collect response text when waiting (user pressed Enter)
-      if (terminal.waitingForResponse) {
-        const stripped = stripAnsi(data);
-        terminal.responseBuffer += stripped;
-
-        // When output stops for 2s after user input, response is complete
-        clearTimeout(terminal.promptTimer);
-        terminal.promptTimer = setTimeout(() => {
-          const text = cleanResponseText(terminal.responseBuffer);
-          if (text && text.length > 10) {
-            if (onResponse) onResponse(text);
-            // Save assistant message to local file
-            if (onMessage) onMessage("assistant", text);
-          }
-          terminal.responseBuffer = "";
-          terminal.waitingForResponse = false;
-        }, 2000);
+      if (terminal.outputBuffer.length > MAX_BUFFER) {
+        terminal.outputBuffer = terminal.outputBuffer.slice(-MAX_BUFFER);
       }
+      if (onOutput) onOutput(data);
     });
 
     // Handle exit
     ptyProcess.onExit(({ exitCode, signal }) => {
       console.log(`[Terminal] ${conversationId.slice(0, 8)} exited (code=${exitCode}, signal=${signal})`);
+      if (terminal.sessionTailer) {
+        terminal.sessionTailer.stop();
+        terminal.sessionTailer = null;
+      }
       this.terminals.delete(conversationId);
       if (onExit) onExit(exitCode);
     });
 
-    terminal.onMessage = onMessage;
     terminal.spawnedAt = Date.now();
     terminal.cwd = cwd;
+    terminal.trustAccepted = false;
     this.terminals.set(conversationId, terminal);
+
+    // Auto-accept workspace trust dialog by watching output (strip ANSI before matching)
+    const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "").replace(/[\x00-\x08\x0e-\x1f]/g, "");
+    const trustCheck = setInterval(() => {
+      if (terminal.trustAccepted) { clearInterval(trustCheck); return; }
+      const recent = stripAnsi(terminal.outputBuffer.slice(-3000));
+      if (recent.includes("trust") && (recent.includes("Yes") || recent.includes("folder"))) {
+        console.log(`[Terminal] Auto-accepting trust dialog for ${conversationId.slice(0, 8)}`);
+        ptyProcess.write("\r");
+        terminal.trustAccepted = true;
+        clearInterval(trustCheck);
+      }
+    }, 500);
+    // Stop checking after 15 seconds
+    setTimeout(() => { clearInterval(trustCheck); terminal.trustAccepted = true; }, 15000);
     console.log(`[Terminal] Created ${mode} terminal for ${conversationId.slice(0, 8)} (PID ${ptyProcess.pid})`);
 
     return { pid: ptyProcess.pid };
@@ -247,25 +249,6 @@ export class TerminalManager {
     const terminal = this.terminals.get(conversationId);
     if (terminal?.pty) {
       terminal.pty.write(data);
-
-      // Track user input character by character
-      if (data.includes("\r") || data.includes("\n")) {
-        // User pressed Enter — save the input as a user message
-        const userInput = terminal.userInputBuffer.trim();
-        if (userInput && userInput.length > 0 && terminal.onMessage) {
-          terminal.onMessage("user", userInput);
-        }
-        terminal.userInputBuffer = "";
-        terminal.waitingForResponse = true;
-        terminal.responseBuffer = "";
-        clearTimeout(terminal.promptTimer);
-      } else if (data === "\x7f" || data === "\b") {
-        // Backspace
-        terminal.userInputBuffer = terminal.userInputBuffer.slice(0, -1);
-      } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
-        // Printable character
-        terminal.userInputBuffer += data;
-      }
       return true;
     }
     return false;
@@ -283,6 +266,11 @@ export class TerminalManager {
   destroyTerminal(conversationId) {
     const terminal = this.terminals.get(conversationId);
     if (terminal?.pty) {
+      // Stop session tailer if attached
+      if (terminal.sessionTailer) {
+        terminal.sessionTailer.stop();
+        terminal.sessionTailer = null;
+      }
       try {
         const pid = terminal.pty.pid;
         if (pid) {
@@ -308,6 +296,46 @@ export class TerminalManager {
 
   getActiveTerminals() {
     return Array.from(this.terminals.keys());
+  }
+
+  listTerminals() {
+    return Array.from(this.terminals.entries()).map(([id, t]) => ({
+      conversationId: id,
+      pid: t.pid || null,
+      mode: t.mode || null,
+      hasPty: !!t.pty,
+    }));
+  }
+
+  // Get the last N chars of terminal output (with ANSI stripped for readability)
+  getScreenContent(conversationId, lastChars = 2000) {
+    const terminal = this.terminals.get(conversationId);
+    if (!terminal) return null;
+    const raw = terminal.outputBuffer.slice(-lastChars);
+    // Strip ANSI escape codes
+    const clean = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "").replace(/[\x00-\x08\x0e-\x1f]/g, "");
+    return { raw: raw.slice(-lastChars), clean, bufferSize: terminal.outputBuffer.length };
+  }
+
+  /**
+   * Attach a SessionTailer to read clean messages from Claude Code's session JSONL.
+   * @param {string} conversationId
+   * @param {string} sessionId - Claude Code session ID
+   * @param {Function} onMessage - (role, content, timestamp) callback
+   * @param {boolean} startFromEnd - if true, only capture new messages (for resumed sessions)
+   */
+  attachSessionTailer(conversationId, sessionId, onMessage, startFromEnd = false) {
+    const terminal = this.terminals.get(conversationId);
+    if (!terminal) return;
+
+    // Stop existing tailer if any
+    if (terminal.sessionTailer) {
+      terminal.sessionTailer.stop();
+    }
+
+    const tailer = new SessionTailer(sessionId, onMessage);
+    tailer.start(startFromEnd);
+    terminal.sessionTailer = tailer;
   }
 
   // Detect the Claude CLI session ID by finding the newest .jsonl across all project dirs

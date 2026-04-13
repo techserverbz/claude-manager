@@ -319,10 +319,18 @@ export default function App() {
       ));
     });
 
-    s.on("conversation:updated", ({ conversationId, claude_session_id }) => {
-      setConversations((prev) => prev.map((c) =>
-        c.id === conversationId ? { ...c, claude_session_id } : c
-      ));
+    s.on("conversation:updated", ({ conversationId, ...fields }) => {
+      setConversations((prev) => prev.map((c) => {
+        if (c.id !== conversationId) return c;
+        // Only update fields that were actually sent (not undefined)
+        const updates = {};
+        if (fields.claude_session_id !== undefined) updates.claude_session_id = fields.claude_session_id;
+        if (fields.mode !== undefined) {
+          const meta = typeof c.metadata === "string" ? JSON.parse(c.metadata || "{}") : (c.metadata || {});
+          updates.metadata = { ...meta, mode: fields.mode };
+        }
+        return { ...c, ...updates };
+      }));
     });
 
     s.on("mode:changed", ({ mode }) => setAgentMode(mode));
@@ -483,25 +491,31 @@ export default function App() {
         }
       }
 
-      // For terminal conversations with a session ID, load from CLI session file (structured events)
+      // For any conversation with a session ID, load from CLI session file (structured events)
       const sessionId = convoMeta?.claude_session_id;
-      const isTerminal = convoMeta?.metadata?.mode?.startsWith("terminal");
-      if (!loadMore && sessionId && isTerminal) {
-        try {
-          const replayRes = await fetch(`/api/sessions/${sessionId}/replay`);
-          const events = await replayRes.json();
-          if (Array.isArray(events) && events.length > 0) {
-            const { cliEvents, cwd } = convertSessionEvents(events, convoId);
-            setCliEventsByConvo((prev) => ({
-              ...prev,
-              [convoId]: forceReload ? cliEvents : (prev[convoId]?.length > 0 ? prev[convoId] : cliEvents),
-            }));
-            setHasMoreByConvo((prev) => ({ ...prev, [convoId]: false }));
-            setTotalMsgsByConvo((prev) => ({ ...prev, [convoId]: cliEvents.length }));
-            if (cwd) setCwdByConvo((prev) => ({ ...prev, [convoId]: cwd }));
-            return; // loaded from session file — skip flat message loading
-          }
-        } catch {} // fall through to flat messages if session file not found
+      const meta = typeof convoMeta?.metadata === "string" ? JSON.parse(convoMeta.metadata || "{}") : (convoMeta?.metadata || {});
+      const originalSessionId = meta.original_session_id;
+      // Try current session ID first, then original (pre-rename) session ID
+      const sessionIdsToTry = [sessionId, originalSessionId].filter(Boolean);
+      if (!loadMore && sessionIdsToTry.length > 0) {
+        for (const sid of sessionIdsToTry) {
+          try {
+            const replayRes = await fetch(`/api/sessions/${sid}/replay`);
+            if (!replayRes.ok) continue;
+            const events = await replayRes.json();
+            if (Array.isArray(events) && events.length > 0) {
+              const { cliEvents, cwd } = convertSessionEvents(events, convoId);
+              setCliEventsByConvo((prev) => ({
+                ...prev,
+                [convoId]: forceReload ? cliEvents : (prev[convoId]?.length > 0 ? prev[convoId] : cliEvents),
+              }));
+              setHasMoreByConvo((prev) => ({ ...prev, [convoId]: false }));
+              setTotalMsgsByConvo((prev) => ({ ...prev, [convoId]: cliEvents.length }));
+              if (cwd) setCwdByConvo((prev) => ({ ...prev, [convoId]: cwd }));
+              return; // loaded from session file — skip flat message loading
+            }
+          } catch {} // try next or fall through
+        }
       }
 
       // Standard paginated message loading (process mode or fallback)
@@ -876,6 +890,13 @@ export default function App() {
           onModeChange={setAgentMode}
           onToggleStar={toggleStar}
           onChangeAgent={changeConversationAgent}
+          onReorderStarred={(orderedIds) => {
+            setConversations((prev) => prev.map((c) => {
+              const idx = orderedIds.indexOf(c.id);
+              if (idx === -1) return c;
+              return { ...c, metadata: { ...(c.metadata || {}), sort_order: idx } };
+            }));
+          }}
           onClose={() => setSidebarOpen(false)}
         />
       )}
@@ -1068,6 +1089,7 @@ export default function App() {
                     onLoadMore={() => loadConversationMessages(cid, true)}
                     sessionCwd={cwdByConvo[cid] || null}
                     autoShowTerminal={showTerminalFor?.convoId === cid ? showTerminalFor.ts : null}
+                    onSwitchMode={(newMode) => changeConversationMode(cid, newMode)}
                   />
                 </div>
               );
@@ -1113,16 +1135,19 @@ export default function App() {
             onLoadMore={() => loadConversationMessages(currentConvoId, true)}
             sessionCwd={cwdByConvo[currentConvoId] || null}
             autoShowTerminal={showTerminalFor?.convoId === currentConvoId ? showTerminalFor.ts : null}
+            onSwitchMode={(newMode) => changeConversationMode(currentConvoId, newMode)}
           />
         )}
 
-        <VoiceOrb
-          isListening={isListening}
-          isSpeaking={false}
-          isThinking={isThinking}
-          onToggle={toggleListening}
-          onStop={() => socketRef.current?.emit("chat:stop", { conversationId: currentConvoId })}
-        />
+        {currentMode === "terminal-persistent" && (
+          <VoiceOrb
+            isListening={isListening}
+            isSpeaking={false}
+            isThinking={isThinking}
+            onToggle={toggleListening}
+            onStop={() => socketRef.current?.emit("chat:stop", { conversationId: currentConvoId })}
+          />
+        )}
       </main>
     </div>
   );

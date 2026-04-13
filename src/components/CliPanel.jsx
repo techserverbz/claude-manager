@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
+import Markdown from "react-markdown";
 import XtermPanel from "./XtermPanel.jsx";
 import "./CliPanel.css";
 
-export default function CliPanel({ events, streamingText, isThinking, onSendMessage, onStop, socket, conversationId, keepAlive, onToggleKeepAlive, mode, conversationConfig, isNewConversation, sessionId, viewMessages, onCloseViewMessages, hasMore, totalMessages, onLoadMore, sessionCwd, autoShowTerminal }) {
+export default function CliPanel({ events, streamingText, isThinking, onSendMessage, onStop, socket, conversationId, keepAlive, onToggleKeepAlive, mode, conversationConfig, isNewConversation, sessionId, viewMessages, onCloseViewMessages, hasMore, totalMessages, onLoadMore, sessionCwd, autoShowTerminal, onSwitchMode }) {
   const isTerminalConvo = mode === "terminal-oneshot" || mode === "terminal-persistent";
 
   // ALL hooks must be declared before any conditional returns (React rules of hooks)
@@ -31,7 +32,11 @@ export default function CliPanel({ events, streamingText, isThinking, onSendMess
   }, [cwdMenu]);
 
   // Reset to message view when conversation changes, or show terminal if requested
-  useEffect(() => { setShowTerminal(!!autoShowTerminal); }, [conversationId, autoShowTerminal]);
+  useEffect(() => {
+    setShowTerminal(!!autoShowTerminal);
+    stickToBottom.current = true;
+    prevEventsLen.current = 0; // Reset so next events load triggers scroll
+  }, [conversationId, autoShowTerminal]);
 
   // Find in chat — highlight and navigate matches
   useEffect(() => {
@@ -78,9 +83,18 @@ export default function CliPanel({ events, streamingText, isThinking, onSendMess
     if (showFind && findInputRef.current) findInputRef.current.focus();
   }, [showFind]);
 
+  const prevEventsLen = useRef(0);
   useEffect(() => {
-    if (stickToBottom.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const wasEmpty = prevEventsLen.current === 0;
+    prevEventsLen.current = events.length;
+    // Always scroll on initial load (0 → N), otherwise respect stickToBottom
+    if ((wasEmpty && events.length > 0) || stickToBottom.current) {
+      if (scrollRef.current) {
+        // Use setTimeout to ensure DOM has rendered the new messages
+        setTimeout(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }, 50);
+      }
     }
   }, [events.length, streamingText]);
 
@@ -115,6 +129,12 @@ export default function CliPanel({ events, streamingText, isThinking, onSendMess
           <span className="cli-mode-indicator terminal">{mode === "terminal-persistent" ? "Terminal (Persistent)" : "Terminal (One-shot)"}</span>
           {sessionId && <span className="cli-session-tag" title="Click to copy" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(sessionId); const el = e.currentTarget; el.classList.add("copied"); setTimeout(() => el.classList.remove("copied"), 1200); }}>{sessionId}</span>}
           {sessionCwd && <span className="cli-cwd-tag" title={sessionCwd} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCwdMenu({ x: e.clientX, y: e.clientY }); }}>{sessionCwd}</span>}
+          {onSwitchMode && (
+            <button onClick={() => onSwitchMode("process-persistent")} className="cli-mode-bar-btn switch-mode" title="Switch to Process mode">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
+              Process
+            </button>
+          )}
           <button onClick={() => setShowTerminal(false)} className="cli-mode-bar-btn">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
             Messages
@@ -200,6 +220,12 @@ export default function CliPanel({ events, streamingText, isThinking, onSendMess
         </span>
         {sessionId && <span className="cli-session-tag" title="Click to copy" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(sessionId); const el = e.currentTarget; el.classList.add("copied"); setTimeout(() => el.classList.remove("copied"), 1200); }}>{sessionId}</span>}
         {sessionCwd && <span className="cli-cwd-tag" title={sessionCwd} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCwdMenu({ x: e.clientX, y: e.clientY }); }}>{sessionCwd}</span>}
+        {onSwitchMode && (
+          <button onClick={() => onSwitchMode(isTerminalConvo ? "process-persistent" : "terminal-persistent")} className="cli-mode-bar-btn switch-mode" title={isTerminalConvo ? "Switch to Process" : "Switch to Terminal"}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
+            {isTerminalConvo ? "Process" : "Terminal"}
+          </button>
+        )}
         {isTerminalConvo && sessionId && (
           <button onClick={() => setShowTerminal(true)} className="cli-mode-bar-btn resume">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
@@ -419,16 +445,45 @@ function CliToolCall({ block, id, collapsed, onToggle }) {
 
 function CliText({ text }) {
   if (!text) return null;
-  return text.split(/(```[\s\S]*?```)/g).map((part, i) => {
-    if (part.startsWith("```") && part.endsWith("```")) {
-      const content = part.slice(3, -3);
-      const nl = content.indexOf("\n");
-      const lang = nl > 0 ? content.slice(0, nl).trim() : "";
-      const code = nl > 0 ? content.slice(nl + 1) : content;
-      return <pre key={i} className="cli-code-block">{lang && <div className="cli-code-lang">{lang}</div>}<code>{code}</code></pre>;
-    }
-    return <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part}</span>;
-  });
+  // Strip ANSI escape codes and terminal control chars
+  const clean = text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/[\x00-\x08\x0e-\x1f]/g, "");
+  return (
+    <div className="cli-markdown">
+      <Markdown
+        components={{
+          code({ inline, className, children, ...props }) {
+            const lang = className?.replace("language-", "") || "";
+            if (!inline) {
+              return (
+                <pre className="cli-code-block">
+                  {lang && <div className="cli-code-lang">{lang}</div>}
+                  <code {...props}>{children}</code>
+                </pre>
+              );
+            }
+            return <code className="cli-inline-code" {...props}>{children}</code>;
+          },
+          p({ children }) { return <p style={{ margin: "4px 0" }}>{children}</p>; },
+          ul({ children }) { return <ul style={{ margin: "4px 0", paddingLeft: "20px" }}>{children}</ul>; },
+          ol({ children }) { return <ol style={{ margin: "4px 0", paddingLeft: "20px" }}>{children}</ol>; },
+          li({ children }) { return <li style={{ margin: "2px 0" }}>{children}</li>; },
+          h1({ children }) { return <h1 style={{ fontSize: "1.3em", margin: "8px 0 4px", color: "var(--text-primary)" }}>{children}</h1>; },
+          h2({ children }) { return <h2 style={{ fontSize: "1.15em", margin: "8px 0 4px", color: "var(--text-primary)" }}>{children}</h2>; },
+          h3({ children }) { return <h3 style={{ fontSize: "1.05em", margin: "6px 0 3px", color: "var(--text-primary)" }}>{children}</h3>; },
+          a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>{children}</a>; },
+          blockquote({ children }) { return <blockquote style={{ borderLeft: "3px solid var(--border)", paddingLeft: "10px", margin: "4px 0", color: "var(--text-muted)" }}>{children}</blockquote>; },
+          table({ children }) { return <table style={{ borderCollapse: "collapse", margin: "6px 0", width: "100%" }}>{children}</table>; },
+          th({ children }) { return <th style={{ border: "1px solid var(--border)", padding: "4px 8px", textAlign: "left", background: "var(--bg-tertiary)", fontSize: "12px" }}>{children}</th>; },
+          td({ children }) { return <td style={{ border: "1px solid var(--border)", padding: "4px 8px", fontSize: "12px" }}>{children}</td>; },
+          hr() { return <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "8px 0" }} />; },
+          strong({ children }) { return <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>{children}</strong>; },
+          em({ children }) { return <em>{children}</em>; },
+        }}
+      >
+        {clean}
+      </Markdown>
+    </div>
+  );
 }
 
 function getToolIcon(name) {

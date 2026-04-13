@@ -1,7 +1,7 @@
 # Christopher v3 — Codebase Reference
 
 > **11,330 lines** | React 18 + Express + Socket.IO + Supabase PostgreSQL
-> **Last updated:** 2026-04-02
+> **Last updated:** 2026-04-09
 
 ---
 
@@ -11,8 +11,9 @@
 Christopher v3
 ├── server/                    Express + Socket.IO backend
 │   ├── index.js               Main server, 55 API routes, socket handlers (1696 lines)
-│   ├── claude-manager.js      Claude CLI spawner: one-shot + persistent modes (521 lines)
-│   ├── terminal-manager.js    node-pty terminal: PTY spawn, message capture, session detect (302 lines)
+│   ├── claude-manager.js      Claude CLI spawner: one-shot + persistent modes, cwd resolution (560 lines)
+│   ├── terminal-manager.js    node-pty terminal: PTY spawn, session detect, SessionTailer attach (310 lines)
+│   ├── session-tailer.js      Tails Claude's JSONL for clean message capture (replaces terminal scraping) (120 lines)
 │   ├── memory-manager.js      Multi-agent memory + local message storage + pagination (427 lines)
 │   ├── db.js                  Supabase cloud or embedded PostgreSQL fallback (387 lines)
 │   ├── auto-migration-system.js  Schema auto-migration on startup (230 lines)
@@ -70,6 +71,17 @@ Christopher v3
 | **process-oneshot** | `claude-manager.js` → `--print`, dies after response | `CliPanel.jsx` chat UI | Chat UI, new process per message |
 
 Master Chat is always `process-persistent`. Right-click > Settings to change mode per conversation.
+
+### Mode Conversion (terminal ↔ process)
+
+`PUT /api/conversations/:id/mode` switches mode and **kills the old process/PTY**:
+- terminal → process: kills the PTY via `terminalManager.destroyTerminal()`
+- process → terminal: kills persistent process via `claudeManager.stopConversation()`
+- Previously (pre Apr 9) this only updated DB metadata, leaving zombie processes.
+
+### Context Overflow
+
+Each process dispatch (`--print --resume <sessionId>`) is a **separate process spawn**. The Claude CLI reads the session JSONL, auto-compresses older turns if context is too long, then sends the message. No special handling needed — the CLI manages context compression internally on every invocation.
 
 ---
 
@@ -205,7 +217,9 @@ Messages moved to local files to save Supabase storage (~90% reduction).
 | PUT | `/api/conversations/:id/mode` | Set mode |
 | PUT | `/api/conversations/:id/status` | Set status (kills PTY/process if "completed") |
 | POST | `/api/conversations/:id/keep-alive` | Toggle persistent |
-| POST | `/api/conversations/:id/dispatch` | Dispatch task to worker |
+| POST | `/api/conversations/:id/dispatch` | Dispatch task to worker (mode-aware: terminal PTY or process, with fallback) |
+| PUT | `/api/conversations/:id/session` | Manually set session ID |
+| GET | `/api/conversations/:id/session-history` | Session ID change log |
 | GET | `/api/conversations/:id/messages` | Get messages — supports `?limit=50&offset=0&maxContentLen=20000` for pagination |
 | GET | `/api/conversations/:id/last-messages` | Recent messages (uses paginated reader) |
 | POST | `/api/master-chat` | Get/create master chat |
@@ -269,6 +283,22 @@ Messages moved to local files to save Supabase storage (~90% reduction).
 | `queue:update` | Status changed |
 | `mode:changed` | Agent mode switched |
 | `conversation:updated` | Session ID detected (live update) |
+
+---
+
+## Dispatch System (Master → Worker)
+
+**Endpoint:** `POST /api/conversations/:id/dispatch` `{ text, keepAlive? }`
+
+The dispatch endpoint is mode-aware with automatic fallback:
+
+| Target Mode | PTY Live? | What Happens |
+|---|---|---|
+| `process-*` | n/a | `claudeManager.sendPersistentMessage()` — spawns `claude --print --resume <sessionId>` from resolved cwd |
+| `terminal` | yes | Writes `text + \r` directly to PTY (like a human typing) |
+| `terminal` | no | Falls back to process dispatch — same `--resume` mechanism works regardless of original mode |
+
+**Architecture:** Master chat (terminal mode, where user sits) dispatches to worker chats. Workers can be any mode — dispatch handles routing. Response comes back via `chat:complete` socket event or is captured by SessionTailer (terminal path).
 
 ---
 
@@ -344,7 +374,26 @@ When a terminal PTY starts:
 4. Frontend gets `conversation:updated` socket event — sidebar shows session ID instantly
 5. Next reconnect passes `--resume {sessionId}` to restore the session
 
-Terminal messages (user input + assistant responses) are captured from the PTY stream and saved to local JSONL, with ANSI codes stripped.
+### Message Capture — SessionTailer (Apr 9)
+
+`session-tailer.js` tails Claude's authoritative JSONL (`~/.claude/projects/{hash}/{sessionId}.jsonl`) via `fs.watchFile`. This replaced the old approach of scraping terminal output (which produced garbled messages with ANSI remnants, spinner chars, TUI noise).
+
+- Extracts only `end_turn` assistant text blocks and user messages
+- Attaches via `terminalManager.attachSessionTailer(convId, sessionId, callback)`
+- Clean messages saved to local JSONL via `memoryManager.appendMessage()`
+
+### Cross-Directory Session Resume (Apr 9)
+
+`claude --resume <sessionId>` only works from the **same cwd** as the original session. Claude hashes the cwd into the project directory path (`~/.claude/projects/{hash}/`). Sessions created from `I:\My Drive\Services\Liaisoning` live under `I--My-Drive-Services-Liaisoning/`, not the default `C--Users-Shubham-Code-/`.
+
+Both managers resolve cwd automatically:
+- `ClaudeManager._resolveSessionCwd(sessionId)` — scans all `~/.claude/projects/*/` for the JSONL, reads the `cwd` field from the first event
+- `TerminalManager` uses shared `findSessionCwd()` in the same way
+- Falls back to `agentConfig.workingDirectory` or `C:/Users/Shubham(Code)` if not found
+
+### Session ID Protection (Apr 9)
+
+On dispatch, if `--resume` fails and Claude creates a new (empty) session, the **original session ID is preserved** in the DB. Only updated if the returned session ID matches the original (confirmed successful resume) or if there was no prior session ID.
 
 ---
 
@@ -416,7 +465,7 @@ xterm.js viewport can jump to the top when the browser window loses focus (cause
 ## Running
 
 ```bash
-cd "C:/Users/Shubham(Code)/Documents/26.React + Claude (Final)"
+cd "C:/Users/Shubham(Code)/Desktop/Github/26.Claude Manager"
 npm install
 npx vite build          # Build frontend → dist/
 npm start               # Starts server on :3000, serves dist/

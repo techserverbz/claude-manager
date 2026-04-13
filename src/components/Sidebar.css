@@ -302,6 +302,12 @@
   padding: 8px 0;
 }
 
+/* Drag and drop */
+.dnd-wrapper { transition: transform 0.12s ease, opacity 0.12s ease; }
+.dnd-wrapper[draggable] { cursor: grab; }
+.dnd-dragging { opacity: 0.4; transform: scale(0.97); }
+.dnd-over { border-top: 2px solid var(--accent); margin-top: -2px; }
+
 .section-header {
   display: flex;
   align-items: center;

@@ -736,10 +736,20 @@ app.put("/api/conversations/:id/title", async (req, res) => {
   }
 });
 
-// Update conversation mode
+// Update conversation session ID (rename/alias)
 app.put("/api/conversations/:id/session", async (req, res) => {
   try {
     const { sessionId } = req.body;
+    // Preserve the original UUID session ID in metadata so JSONL can still be found
+    const convo = (await db.query("SELECT claude_session_id, metadata FROM conversations WHERE id = $1", [req.params.id])).rows[0];
+    if (convo && convo.claude_session_id && sessionId && sessionId !== convo.claude_session_id) {
+      const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
+      // Only set original if not already set (don't overwrite the true original)
+      if (!meta.original_session_id) {
+        meta.original_session_id = convo.claude_session_id;
+        await db.query("UPDATE conversations SET metadata = $1 WHERE id = $2", [JSON.stringify(meta), req.params.id]);
+      }
+    }
     await db.query(
       "UPDATE conversations SET claude_session_id = $1, updated_at = NOW() WHERE id = $2",
       [sessionId || null, req.params.id]
@@ -770,13 +780,56 @@ app.get("/api/conversations/:id/session-history", async (req, res) => {
 app.put("/api/conversations/:id/mode", async (req, res) => {
   try {
     const { mode } = req.body;
+    const convId = req.params.id;
     const validModes = ["terminal-persistent", "process-oneshot", "process-persistent"];
     if (!validModes.includes(mode)) return res.status(400).json({ error: "Invalid mode" });
+
+    // Get current mode to detect transitions
+    const convoResult = await db.query("SELECT metadata FROM conversations WHERE id = $1", [convId]);
+    const currentMeta = convoResult.rows[0]?.metadata || {};
+    const currentMode = currentMeta.mode || "";
+    const switchingFromTerminal = currentMode.startsWith("terminal") && !mode.startsWith("terminal");
+    const switchingFromProcess = currentMode.startsWith("process") && !mode.startsWith("process");
+
+    // Kill existing PTY when switching FROM terminal to process
+    if (switchingFromTerminal) {
+      const killed = terminalManager.destroyTerminal(convId);
+      if (killed) console.log(`[Mode] Killed PTY for ${convId.slice(0, 8)} (terminal → process)`);
+    }
+
+    // Kill existing persistent process when switching FROM process to terminal
+    if (switchingFromProcess) {
+      const killed = claudeManager.stopConversation(convId);
+      if (killed) console.log(`[Mode] Killed process for ${convId.slice(0, 8)} (process → terminal)`);
+    }
+
+    // Update keepAlive tracking
+    if (mode === "process-persistent" || mode === "terminal-persistent") {
+      keepAliveConversations.add(convId);
+    } else {
+      keepAliveConversations.delete(convId);
+    }
+
     await db.query(
       `UPDATE conversations SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb, updated_at = NOW() WHERE id = $2`,
-      [JSON.stringify({ mode }), req.params.id]
+      [JSON.stringify({ mode }), convId]
     );
+    io.emit("conversation:updated", { conversationId: convId, mode });
     res.json({ ok: true, mode });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update conversation metadata (merge)
+app.patch("/api/conversations/:id/metadata", async (req, res) => {
+  try {
+    const patch = req.body;
+    await db.query(
+      `UPDATE conversations SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(patch), req.params.id]
+    );
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -818,7 +871,118 @@ app.get("/api/conversations/:id/messages", (req, res) => {
   }
 });
 
+// Read current terminal screen content
+app.get("/api/conversations/:id/terminal/screen", (req, res) => {
+  const lastChars = parseInt(req.query.chars) || 2000;
+  const screen = terminalManager.getScreenContent(req.params.id, lastChars);
+  if (!screen) return res.status(404).json({ error: "No live PTY for this conversation" });
+  res.json(screen);
+});
+
+// Write to a live terminal PTY (REST alternative to socket pty:input)
+app.post("/api/conversations/:id/terminal/write", (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "text is required" });
+  const terminal = terminalManager.getTerminal(req.params.id);
+  if (!terminal?.pty) return res.status(404).json({ error: "No live PTY for this conversation" });
+  terminalManager.writeToTerminal(req.params.id, text + "\r");
+  res.json({ ok: true, method: "terminal" });
+});
+
+// List active terminal sessions
+app.get("/api/terminals", (req, res) => {
+  const terminals = terminalManager.listTerminals ? terminalManager.listTerminals() : [];
+  res.json(terminals);
+});
+
+// Start a terminal session for a conversation (REST alternative to socket pty:create)
+app.post("/api/conversations/:id/terminal/start", async (req, res) => {
+  try {
+    const conversationId = req.params.id;
+    const convoResult = await db.query("SELECT * FROM conversations WHERE id = $1", [conversationId]);
+    if (convoResult.rows.length === 0) return res.status(404).json({ error: "Conversation not found" });
+    const convo = convoResult.rows[0];
+
+    // If terminal already exists, return it
+    const existing = terminalManager.getTerminal(conversationId);
+    if (existing?.pty) {
+      return res.json({ ok: true, status: "already_running", pid: existing.pid });
+    }
+
+    const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
+    const mode = meta.mode || "terminal-persistent";
+    const termConfig = { sessionId: convo.claude_session_id };
+
+    const agent = convo.agent || memoryManager.getMode();
+    const tailerCallback = (role, content, timestamp) => {
+      memoryManager.appendMessage(conversationId, role, content, agent, { source: "session-jsonl", timestamp });
+    };
+
+    const result = await terminalManager.createTerminal(conversationId, {
+      mode,
+      config: termConfig,
+      cols: 120,
+      rows: 30,
+      onOutput: (data) => {
+        io.emit("pty:output", { conversationId, data });
+      },
+      onExit: async (exitCode) => {
+        io.emit("pty:exit", { conversationId, code: exitCode });
+        await db.query("UPDATE conversations SET status = 'active', updated_at = NOW() WHERE id = $1", [conversationId]).catch(() => {});
+      },
+    });
+
+    // Attach session tailer if session ID known
+    if (convo.claude_session_id) {
+      terminalManager.attachSessionTailer(conversationId, convo.claude_session_id, tailerCallback, true);
+    }
+
+    // Detect session ID if not set
+    if (!convo.claude_session_id) {
+      const detectInterval = setInterval(async () => {
+        const sid = terminalManager.detectSessionId(conversationId);
+        if (sid) {
+          clearInterval(detectInterval);
+          await db.query("UPDATE conversations SET claude_session_id = $1, updated_at = NOW() WHERE id = $2", [sid, conversationId]).catch(() => {});
+          io.emit("conversation:updated", { conversationId, claude_session_id: sid });
+          terminalManager.attachSessionTailer(conversationId, sid, tailerCallback, false);
+        }
+      }, 2000);
+      setTimeout(() => clearInterval(detectInterval), 60000);
+    }
+
+    res.json({ ok: true, status: "started", pid: result.pid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Status of all conversations — mode, session, terminal state
+app.get("/api/status", async (req, res) => {
+  try {
+    const convos = await db.query("SELECT id, title, claude_session_id, status, metadata FROM conversations ORDER BY updated_at DESC");
+    const activeTerminals = terminalManager.getActiveTerminals();
+    const result = convos.rows.map((c) => {
+      const meta = typeof c.metadata === "string" ? JSON.parse(c.metadata || "{}") : (c.metadata || {});
+      const terminal = terminalManager.getTerminal(c.id);
+      return {
+        id: c.id,
+        title: c.title,
+        session_id: c.claude_session_id,
+        status: c.status,
+        mode: meta.mode || null,
+        terminal: terminal ? { pid: terminal.pid, alive: !!terminal.pty } : null,
+        starred: meta.starred || false,
+      };
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Dispatch a task to a conversation (used by Master Chat to assign work)
+// Supports both terminal and process modes with automatic fallback.
 app.post("/api/conversations/:id/dispatch", async (req, res) => {
   try {
     const conversationId = req.params.id;
@@ -828,11 +992,39 @@ app.post("/api/conversations/:id/dispatch", async (req, res) => {
     // Save user message
     memoryManager.appendMessage(conversationId, "user", text);
 
-    // Get or create conversation
+    // Get conversation
     const convoResult = await db.query("SELECT * FROM conversations WHERE id = $1", [conversationId]);
     if (convoResult.rows.length === 0) return res.status(404).json({ error: "Conversation not found" });
     const convo = convoResult.rows[0];
 
+    const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
+    const mode = meta.mode || "process-persistent";
+
+    // ── TERMINAL DISPATCH ──────────────────────────────────────────────
+    // If conversation is in terminal mode and has a live PTY, write directly to it.
+    // This is fire-and-forget — the SessionTailer picks up the response from the JSONL.
+    if (mode.startsWith("terminal")) {
+      const terminal = terminalManager.getTerminal(conversationId);
+      if (terminal?.pty) {
+        console.log(`[Dispatch] Terminal mode → writing to PTY for ${conversationId.slice(0, 8)}`);
+        // Update status
+        await db.query(
+          "UPDATE conversations SET status = 'in_progress', updated_at = NOW() WHERE id = $1",
+          [conversationId]
+        );
+        io.emit("queue:update", { conversationId, status: "in_progress", summary: "" });
+
+        // Write the text + Enter to the PTY (like a human typing)
+        terminalManager.writeToTerminal(conversationId, text + "\r");
+
+        return res.json({ ok: true, conversationId, method: "terminal", message: "Sent to terminal PTY" });
+      }
+
+      // Terminal mode but PTY not running — fall through to process dispatch
+      console.log(`[Dispatch] Terminal mode but no live PTY for ${conversationId.slice(0, 8)} — falling back to process dispatch`);
+    }
+
+    // ── PROCESS DISPATCH ───────────────────────────────────────────────
     // Dispatched tasks always use keep-alive (process stays alive for multi-step work)
     keepAliveConversations.add(conversationId);
 
@@ -843,7 +1035,6 @@ app.post("/api/conversations/:id/dispatch", async (req, res) => {
     );
     io.emit("queue:update", { conversationId, status: "in_progress", summary: "" });
 
-    const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
     const isMaster = meta.master === true;
     const agentConfig = isMaster ? getMasterChatConfig() : getChristopherConfig();
     if (isMaster) keepAliveConversations.add(conversationId);
@@ -853,32 +1044,46 @@ app.post("/api/conversations/:id/dispatch", async (req, res) => {
       ? claudeManager.sendPersistentMessage.bind(claudeManager)
       : claudeManager.sendMessage.bind(claudeManager);
 
+    const originalSessionId = convo.claude_session_id;
+
     sendFn(
-      text, [], conversationId, agentConfig, convo.claude_session_id,
+      text, [], conversationId, agentConfig, originalSessionId,
       (chunk) => io.emit("chat:chunk", { text: chunk, conversationId }),
       async (fullResponse, sessionId) => {
         memoryManager.appendMessage(conversationId, "assistant", fullResponse);
-        await db.query(
-          "UPDATE conversations SET claude_session_id = $1, status = 'active', updated_at = NOW() WHERE id = $2",
-          [sessionId, conversationId]
-        );
+        const shouldUpdateSession = !originalSessionId || sessionId === originalSessionId;
+        if (shouldUpdateSession) {
+          await db.query(
+            "UPDATE conversations SET claude_session_id = $1, status = 'active', updated_at = NOW() WHERE id = $2",
+            [sessionId, conversationId]
+          );
+        } else {
+          console.log(`[Dispatch] New session ${sessionId?.slice(0,8)} differs from original ${originalSessionId?.slice(0,8)} — keeping original`);
+          await db.query(
+            "UPDATE conversations SET status = 'active', updated_at = NOW() WHERE id = $1",
+            [conversationId]
+          );
+        }
         if (sessionId) db.query("INSERT INTO session_history (conversation_id, session_id, source) VALUES ($1, $2, 'process')", [conversationId, sessionId]).catch(() => {});
         io.emit("queue:update", { conversationId, status: "active", summary: "" });
         io.emit("chat:complete", { text: fullResponse, conversationId });
       },
       async (error) => {
+        const errMsg = error.message.slice(0, 200);
+        console.log(`[Dispatch] Process failed for ${conversationId.slice(0, 8)}: ${errMsg}`);
+        // Don't touch session ID on error — preserve the original
         await db.query(
           "UPDATE conversations SET status = 'error', status_summary = $1, status_updated_at = NOW() WHERE id = $2",
-          [error.message.slice(0, 200), conversationId]
+          [errMsg, conversationId]
         );
-        io.emit("queue:update", { conversationId, status: "error", summary: error.message.slice(0, 200) });
+        io.emit("queue:update", { conversationId, status: "error", summary: errMsg });
         io.emit("chat:error", { error: error.message, conversationId });
       },
       (activity) => io.emit("activity:event", { ...activity, conversationId }),
       (event) => io.emit("cli:event", { ...event, conversationId })
     );
 
-    res.json({ ok: true, conversationId, message: "Task dispatched" });
+    res.json({ ok: true, conversationId, method: "process", message: "Task dispatched" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1566,6 +1771,14 @@ io.on("connection", (socket) => {
         termConfig.addDirs = [path.join(CHRISTOPHER_HOME, "config", "master-chat")];
       }
 
+      const agent = convo.agent || memoryManager.getMode();
+      const tailerCallback = (role, content, timestamp) => {
+        memoryManager.appendMessage(convId, role, content, agent, {
+          source: "session-jsonl",
+          timestamp,
+        });
+      };
+
       const result = await terminalManager.createTerminal(convId, {
         mode,
         config: termConfig,
@@ -1581,14 +1794,14 @@ io.on("connection", (socket) => {
             [convId]
           ).catch(() => {});
         },
-        onMessage: (role, content) => {
-          // Save terminal messages to local JSONL file
-          const agent = convo.agent || memoryManager.getMode();
-          memoryManager.appendMessage(convId, role, content, agent);
-        },
       });
 
       socket.emit("pty:ready", { conversationId: convId, pid: result.pid });
+
+      // If session ID is already known (resumed session), attach tailer immediately
+      if (convo.claude_session_id) {
+        terminalManager.attachSessionTailer(convId, convo.claude_session_id, tailerCallback, true);
+      }
 
       // Detect and save session ID — ONLY if conversation doesn't already have one
       if (!convo.claude_session_id) {
@@ -1603,6 +1816,9 @@ io.on("connection", (socket) => {
             await db.query("INSERT INTO session_history (conversation_id, session_id, source) VALUES ($1, $2, 'auto-detect')", [convId, sid]).catch(() => {});
             console.log(`[Terminal] Detected session ${sid.slice(0, 8)} for ${convId.slice(0, 8)}`);
             io.emit("conversation:updated", { conversationId: convId, claude_session_id: sid });
+
+            // Attach session tailer now that we know the session ID (read from beginning)
+            terminalManager.attachSessionTailer(convId, sid, tailerCallback, false);
             return true;
           }
           return false;

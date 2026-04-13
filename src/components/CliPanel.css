@@ -192,6 +192,17 @@ mark.cli-find-hl.active {
   border-color: var(--success);
 }
 
+.cli-mode-bar-btn.switch-mode {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.3);
+  color: var(--warning);
+}
+
+.cli-mode-bar-btn.switch-mode:hover {
+  background: rgba(234, 179, 8, 0.2);
+  border-color: var(--warning);
+}
+
 .cli-mode-indicator {
   font-size: 11px;
   font-family: 'Cascadia Code', monospace;
@@ -317,6 +328,12 @@ mark.cli-find-hl.active {
 
 /* Assistant text */
 .cli-assistant-text { padding: 8px 0; color: var(--text-primary); line-height: 1.6; }
+
+/* Markdown rendering */
+.cli-markdown { font-size: 13px; line-height: 1.6; word-wrap: break-word; overflow-wrap: break-word; }
+.cli-markdown > *:first-child { margin-top: 0; }
+.cli-markdown > *:last-child { margin-bottom: 0; }
+.cli-inline-code { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; padding: 1px 5px; font-family: 'Fira Code', 'Consolas', monospace; font-size: 0.9em; color: var(--accent-light); }
 
 /* Streaming text */
 .cli-streaming { padding: 8px 0; color: var(--text-primary); line-height: 1.6; }

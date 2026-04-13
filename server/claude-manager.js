@@ -95,6 +95,43 @@ export class ClaudeManager {
     console.log("[Chrome] CDP not ready after 5s, continuing anyway");
   }
 
+  // --- Session CWD resolution ---
+
+  /**
+   * Find the original working directory for a session by scanning all project dirs.
+   * Claude Code's --resume only works when run from the same cwd (project hash) as the original session.
+   */
+  _resolveSessionCwd(sessionId) {
+    if (!sessionId) return null;
+    const projectsDir = path.join(process.env.USERPROFILE || process.env.HOME, ".claude", "projects");
+    if (!fs.existsSync(projectsDir)) return null;
+    try {
+      const dirs = fs.readdirSync(projectsDir).filter(d => {
+        try { return fs.statSync(path.join(projectsDir, d)).isDirectory(); } catch { return false; }
+      });
+      for (const dir of dirs) {
+        const jsonlPath = path.join(projectsDir, dir, `${sessionId}.jsonl`);
+        if (fs.existsSync(jsonlPath)) {
+          // Read first few lines to find the cwd field
+          const fd = fs.openSync(jsonlPath, "r");
+          const buf = Buffer.alloc(4096);
+          fs.readSync(fd, buf, 0, 4096, 0);
+          fs.closeSync(fd);
+          const chunk = buf.toString("utf-8");
+          const lines = chunk.split("\n").filter(Boolean);
+          for (const line of lines) {
+            try {
+              const evt = JSON.parse(line);
+              if (evt.cwd && fs.existsSync(evt.cwd)) return evt.cwd;
+            } catch {}
+          }
+          return null;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
   // --- Args builders ---
 
   _commonArgs(agentConfig, sessionId) {
@@ -157,7 +194,10 @@ export class ClaudeManager {
       const prompt = await this.buildFullPrompt(text, imagePaths, agentConfig, conversationId);
       const args = this.buildOneShotArgs(agentConfig, sessionId);
       const env = this.buildEnv();
-      const cwd = agentConfig?.workingDirectory || "C:/Users/Shubham(Code)";
+      // Resolve cwd from session file when resuming — Claude --resume requires matching project hash
+      const sessionCwd = sessionId ? this._resolveSessionCwd(sessionId) : null;
+      const cwd = sessionCwd || agentConfig?.workingDirectory || "C:/Users/Shubham(Code)";
+      if (sessionCwd) console.log(`[OneShot] Resolved session ${sessionId.slice(0, 8)} cwd: ${sessionCwd}`);
 
       const activity = onActivity || (() => {});
       const rawEvent = onRawEvent || (() => {});
@@ -265,7 +305,10 @@ export class ClaudeManager {
 
       const args = this.buildPersistentArgs(agentConfig, sessionId);
       const env = this.buildEnv();
-      const cwd = agentConfig?.workingDirectory || "C:/Users/Shubham(Code)";
+      // Resolve cwd from session file when resuming — Claude --resume requires matching project hash
+      const sessionCwd = sessionId ? this._resolveSessionCwd(sessionId) : null;
+      const cwd = sessionCwd || agentConfig?.workingDirectory || "C:/Users/Shubham(Code)";
+      if (sessionCwd) console.log(`[Persistent] Resolved session ${sessionId.slice(0, 8)} cwd: ${sessionCwd}`);
 
       console.log(`[Persistent] Spawning: claude ${args.join(" ")}`);
       const child = spawn("claude", args, { cwd, env, shell: true, stdio: ["pipe", "pipe", "pipe"] });

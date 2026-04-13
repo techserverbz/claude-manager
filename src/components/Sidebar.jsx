@@ -49,6 +49,7 @@ export default function Sidebar({
   onModeChange,
   onToggleStar,
   onChangeAgent,
+  onReorderStarred,
   onClose,
 }) {
   const [sidebarTab, setSidebarTab] = useState("chats"); // "chats" | "settings"
@@ -114,8 +115,44 @@ export default function Sidebar({
 
   const filtered = nonMaster.filter(filterConvo);
   const queueItems = filtered.filter((c) => c.status === "waiting_for_user");
-  const starredItems = filtered.filter((c) => c.metadata?.starred && c.status !== "waiting_for_user");
+  const starredUnsorted = filtered.filter((c) => c.metadata?.starred && c.status !== "waiting_for_user");
+  const starredItems = [...starredUnsorted].sort((a, b) => (a.metadata?.sort_order ?? 999) - (b.metadata?.sort_order ?? 999));
   const starredIds = new Set(starredItems.map(c => c.id));
+
+  // DnD state for starred items
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+
+  const handleDragStart = (e, convoId) => {
+    setDragId(convoId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", convoId);
+  };
+  const handleDragOver = (e, convoId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (convoId !== dragOverId) setDragOverId(convoId);
+  };
+  const handleDragEnd = () => { setDragId(null); setDragOverId(null); };
+  const handleDrop = async (e, targetId) => {
+    e.preventDefault();
+    setDragOverId(null);
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    // Reorder: move dragId to targetId's position
+    const ids = starredItems.map(c => c.id);
+    const fromIdx = ids.indexOf(dragId);
+    const toIdx = ids.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) { setDragId(null); return; }
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, dragId);
+    // Persist sort_order for each
+    for (let i = 0; i < ids.length; i++) {
+      fetch(`/api/conversations/${ids[i]}/metadata`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: i }) }).catch(() => {});
+    }
+    // Optimistic update
+    if (typeof onReorderStarred === "function") onReorderStarred(ids);
+    setDragId(null);
+  };
   const sessionItems = filtered.filter((c) => c.claude_session_id && c.status === "active" && activeSessions?.includes(c.id) && !starredIds.has(c.id));
   const otherItems = filtered.filter((c) => c.status !== "waiting_for_user" && !starredIds.has(c.id) && !(c.claude_session_id && c.status === "active" && activeSessions?.includes(c.id)));
 
@@ -296,8 +333,17 @@ export default function Sidebar({
               <span className="starred-count">{starredItems.length}</span>
             </div>
             {starredItems.map((convo) => (
-              <ConvoItem key={convo.id} convo={convo} isActive={convo.id === currentConvoId}
-                onClick={() => onSelectConversation(convo)} onDoubleClick={() => onViewConversationMessages && onViewConversationMessages(convo)} onDelete={onDeleteConversation} onChangeStatus={onChangeStatus} onRename={onRenameConversation} onChangeModel={onChangeModel} currentModel={currentModel} onChangeMode={onChangeMode} convoMode={modeByConvo?.[convo.id] || convo.metadata?.mode} onViewMessages={onViewMessages} onToggleStar={onToggleStar} onChangeAgent={onChangeAgent} agentsList={agents} />
+              <div key={convo.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, convo.id)}
+                onDragOver={(e) => handleDragOver(e, convo.id)}
+                onDragEnd={handleDragEnd}
+                onDrop={(e) => handleDrop(e, convo.id)}
+                className={`dnd-wrapper${dragId === convo.id ? " dnd-dragging" : ""}${dragOverId === convo.id && dragId !== convo.id ? " dnd-over" : ""}`}
+              >
+                <ConvoItem convo={convo} isActive={convo.id === currentConvoId}
+                  onClick={() => onSelectConversation(convo)} onDoubleClick={() => onViewConversationMessages && onViewConversationMessages(convo)} onDelete={onDeleteConversation} onChangeStatus={onChangeStatus} onRename={onRenameConversation} onChangeModel={onChangeModel} currentModel={currentModel} onChangeMode={onChangeMode} convoMode={modeByConvo?.[convo.id] || convo.metadata?.mode} onViewMessages={onViewMessages} onToggleStar={onToggleStar} onChangeAgent={onChangeAgent} agentsList={agents} />
+              </div>
             ))}
           </div>
         )}
@@ -508,8 +554,6 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
           {[
             { value: "active", label: "Active", color: "var(--success)" },
             { value: "completed", label: "Completed", color: "var(--text-muted)" },
-            { value: "waiting_for_user", label: "Waiting", color: "var(--warning)" },
-            { value: "error", label: "Error", color: "var(--danger)" },
           ].map((s) => (
             <button key={s.value} className={`ctx-item ${convo.status === s.value ? "ctx-model-active" : ""}`}
               onClick={() => { setStatus(s.value); }}>
