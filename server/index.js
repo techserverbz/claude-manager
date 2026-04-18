@@ -333,6 +333,31 @@ app.post("/api/open-path", (req, res) => {
   }
 });
 
+// --- Saved Directories ---
+
+app.get("/api/directories", async (req, res) => {
+  try {
+    const result = await db.query("SELECT * FROM saved_directories ORDER BY name ASC");
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/directories", async (req, res) => {
+  try {
+    const { name, path: dirPath } = req.body;
+    if (!name || !dirPath) return res.status(400).json({ error: "name and path required" });
+    const result = await db.query("INSERT INTO saved_directories (name, path) VALUES ($1, $2) RETURNING *", [name.trim(), dirPath.trim()]);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/api/directories/:id", async (req, res) => {
+  try {
+    await db.query("DELETE FROM saved_directories WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- Brain Context (on-demand memory for any CLI instance) ---
 
 app.get("/api/brain/context", async (req, res) => {

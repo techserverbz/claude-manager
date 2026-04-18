@@ -63,6 +63,10 @@ export default function Sidebar({
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [newConvoDir, setNewConvoDir] = useState("");
   const [defaultDir, setDefaultDir] = useState(() => localStorage.getItem("default_working_dir") || "");
+  const [savedDirs, setSavedDirs] = useState([]);
+  const [showAddDir, setShowAddDir] = useState(false);
+  const [newDirName, setNewDirName] = useState("");
+  const [newDirPath, setNewDirPath] = useState("");
   const [masterMenu, setMasterMenu] = useState(null);
 
   useEffect(() => {
@@ -74,6 +78,7 @@ export default function Sidebar({
 
   useEffect(() => {
     fetch("/api/agents").then(r => r.json()).then(setAgents).catch(() => {});
+    fetch("/api/directories").then(r => r.json()).then(setSavedDirs).catch(() => {});
   }, []);
 
   const handleModelSelect = (model) => { if (onChangeModel) onChangeModel(model); setModelMenu(null); };
@@ -279,16 +284,37 @@ export default function Sidebar({
                 </button>
               ))}
               <div className="mode-dir-section">
-                <label className="mode-dir-label">Working Directory</label>
-                <input className="mode-dir-input" placeholder={defaultDir || "Default (home directory)"} value={newConvoDir}
+                <label className="mode-dir-label">Directory</label>
+                <select className="mode-dir-select" value={newConvoDir} onChange={(e) => setNewConvoDir(e.target.value)} onClick={(e) => e.stopPropagation()}>
+                  <option value="">{defaultDir ? `Default: ${defaultDir.split(/[/\\]/).pop()}` : "Home directory"}</option>
+                  {savedDirs.map(d => <option key={d.id} value={d.path}>{d.name}</option>)}
+                </select>
+                <input className="mode-dir-input" placeholder="Or paste a path to override..." value={newConvoDir}
                   onChange={(e) => setNewConvoDir(e.target.value)}
                   onClick={(e) => e.stopPropagation()} />
-                <div className="mode-dir-default">
-                  <input className="mode-dir-input" placeholder="Set default directory..." value={defaultDir}
-                    onChange={(e) => { setDefaultDir(e.target.value); localStorage.setItem("default_working_dir", e.target.value); }}
-                    onClick={(e) => e.stopPropagation()} />
-                  <span className="mode-dir-hint">Default for all new sessions</span>
-                </div>
+                {!showAddDir ? (
+                  <div className="mode-dir-actions">
+                    <button className="mode-dir-add-btn" onClick={(e) => { e.stopPropagation(); setShowAddDir(true); setNewDirPath(newConvoDir); }}>+ Save directory</button>
+                    <button className="mode-dir-add-btn" onClick={(e) => { e.stopPropagation();
+                      const val = prompt("Set default directory (used when no override):", defaultDir);
+                      if (val !== null) { setDefaultDir(val); localStorage.setItem("default_working_dir", val); }
+                    }}>Set default</button>
+                  </div>
+                ) : (
+                  <div className="mode-dir-add-form" onClick={(e) => e.stopPropagation()}>
+                    <input className="mode-dir-input" placeholder="Name (e.g. CRM, Trading)" value={newDirName} onChange={(e) => setNewDirName(e.target.value)} autoFocus />
+                    <input className="mode-dir-input" placeholder="Full path (e.g. C:\Projects\CRM)" value={newDirPath} onChange={(e) => setNewDirPath(e.target.value)} />
+                    <div className="mode-dir-actions">
+                      <button className="mode-dir-save-btn" onClick={async () => {
+                        if (!newDirName.trim() || !newDirPath.trim()) return;
+                        await fetch("/api/directories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDirName.trim(), path: newDirPath.trim() }) });
+                        const res = await fetch("/api/directories"); setSavedDirs(await res.json());
+                        setShowAddDir(false); setNewDirName(""); setNewDirPath("");
+                      }}>Save</button>
+                      <button className="mode-dir-cancel-btn" onClick={() => { setShowAddDir(false); setNewDirName(""); setNewDirPath(""); }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

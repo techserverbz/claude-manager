@@ -99,6 +99,13 @@ export class AutoMigrationSystem {
         created_at: { type: 'TIMESTAMPTZ', default: 'NOW()' }
       },
 
+      saved_directories: {
+        id: { type: 'SERIAL', primary: true },
+        name: { type: 'VARCHAR(100)' },
+        path: { type: 'TEXT' },
+        created_at: { type: 'TIMESTAMPTZ', default: 'NOW()' }
+      },
+
       task_attachments: {
         id: { type: 'SERIAL', primary: true },
         task_id: { type: 'INTEGER', references: 'tasks(id)', cascade: true },
