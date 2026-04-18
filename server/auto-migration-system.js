@@ -151,6 +151,31 @@ export class AutoMigrationSystem {
     const migrations = [];
 
     for (const [tableName, expectedColumns] of Object.entries(expected)) {
+      // If table doesn't exist at all, create it
+      if (!current[tableName]) {
+        const cols = [];
+        for (const [colName, colDef] of Object.entries(expectedColumns)) {
+          let col = `${colName} ${colDef.type}`;
+          if (colDef.primary) col += colDef.type === 'SERIAL' ? ' PRIMARY KEY' : ' PRIMARY KEY DEFAULT ' + colDef.default;
+          else {
+            if (colDef.default) col += ` DEFAULT ${colDef.default}`;
+            if (colDef.nullable) col += '';
+            else if (!colDef.default && !colDef.references) col += '';
+            if (colDef.check) col += ` CHECK (${colDef.check})`;
+            if (colDef.references) col += ` REFERENCES ${colDef.references}${colDef.cascade ? ' ON DELETE CASCADE' : ''}`;
+            if (colDef.unique) col += ' UNIQUE';
+          }
+          cols.push(col);
+        }
+        migrations.push({
+          table: tableName,
+          column: '*',
+          sql: `CREATE TABLE IF NOT EXISTS ${tableName} (${cols.join(', ')});`,
+          safe: true
+        });
+        continue;
+      }
+
       const currentColumns = current[tableName] || {};
 
       for (const [columnName, columnDef] of Object.entries(expectedColumns)) {
