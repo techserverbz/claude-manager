@@ -675,7 +675,7 @@ export default function App() {
 
   const newConversation = async () => newConversationWithMode("process-oneshot");
 
-  const newConversationWithMode = async (mode) => {
+  const newConversationWithMode = async (mode, workingDirectory) => {
     socketRef.current?.emit("chat:new-conversation");
     const modeLabel = {
       "terminal-persistent": "Terminal",
@@ -694,7 +694,10 @@ export default function App() {
       setModeByConvo((prev) => ({ ...prev, [convo.id]: mode }));
       setCliEventsByConvo((prev) => ({ ...prev, [convo.id]: [] }));
       setNewConvoIds((prev) => new Set(prev).add(convo.id));
-      // Set keepAlive for persistent modes
+      if (workingDirectory) {
+        setConfigByConvo((prev) => ({ ...prev, [convo.id]: { ...(prev[convo.id] || {}), workingDirectory } }));
+        setCwdByConvo((prev) => ({ ...prev, [convo.id]: workingDirectory }));
+      }
       if (mode === "process-persistent" || mode === "terminal-persistent") {
         setKeepAliveByConvo((prev) => ({ ...prev, [convo.id]: true }));
       }

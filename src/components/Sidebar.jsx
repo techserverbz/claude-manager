@@ -11,7 +11,7 @@ const ALL_MODELS = [
 ];
 
 const MODE_OPTIONS = [
-  { value: "terminal-persistent", label: "Terminal", icon: "$_", desc: "Full interactive CLI" },
+  { value: "terminal-persistent", label: "Terminal", icon: "$_", desc: "Full interactive CLI", hasDir: true },
   { value: "process-persistent", label: "Process", icon: "[]", desc: "Chat UI, stays alive" },
   { value: "process-oneshot", label: "Process (1x)", icon: ">", desc: "Chat UI, one response" },
 ];
@@ -61,6 +61,8 @@ export default function Sidebar({
   const searchTimeout = useRef(null);
   const [modelMenu, setModelMenu] = useState(null);
   const [showModeMenu, setShowModeMenu] = useState(false);
+  const [newConvoDir, setNewConvoDir] = useState("");
+  const [defaultDir, setDefaultDir] = useState(() => localStorage.getItem("default_working_dir") || "");
   const [masterMenu, setMasterMenu] = useState(null);
 
   useEffect(() => {
@@ -264,8 +266,10 @@ export default function Sidebar({
               {MODE_OPTIONS.map((m) => (
                 <button key={m.value} className="mode-option" onClick={() => {
                   setShowModeMenu(false);
-                  if (onNewConversationWithMode) onNewConversationWithMode(m.value);
+                  const dir = newConvoDir.trim() || defaultDir.trim() || undefined;
+                  if (onNewConversationWithMode) onNewConversationWithMode(m.value, dir);
                   else onNewConversation();
+                  setNewConvoDir("");
                 }}>
                   <span className="mode-icon">{m.icon}</span>
                   <div className="mode-info">
@@ -274,6 +278,18 @@ export default function Sidebar({
                   </div>
                 </button>
               ))}
+              <div className="mode-dir-section">
+                <label className="mode-dir-label">Working Directory</label>
+                <input className="mode-dir-input" placeholder={defaultDir || "Default (home directory)"} value={newConvoDir}
+                  onChange={(e) => setNewConvoDir(e.target.value)}
+                  onClick={(e) => e.stopPropagation()} />
+                <div className="mode-dir-default">
+                  <input className="mode-dir-input" placeholder="Set default directory..." value={defaultDir}
+                    onChange={(e) => { setDefaultDir(e.target.value); localStorage.setItem("default_working_dir", e.target.value); }}
+                    onClick={(e) => e.stopPropagation()} />
+                  <span className="mode-dir-hint">Default for all new sessions</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
