@@ -150,23 +150,52 @@
   padding: 0 !important;
 }
 
-/* Convo items */
-.convo-item, .convo-item-row {
+/* ── Convo items — single tight row with hairline separators ── */
+.convo-item {
+  /* wrapper: resets card-ish defaults from legacy css */
   border-radius: 0 !important;
-  padding: 10px 16px !important;
   border: none !important;
   background: transparent !important;
-  box-shadow: inset 0 -1px 0 var(--rule-0);
+  padding: 8px 14px 8px 18px !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  box-shadow: inset 0 -1px 0 var(--rule-0) !important;
+  position: relative;
   transition: background var(--dur-instant) var(--ease-snap) !important;
+  cursor: pointer;
 }
-.convo-item:hover, .convo-item-row:hover {
-  background: var(--ink-2) !important;
-}
-.convo-item.active, .convo-item-row.active,
-.convo-item[aria-selected="true"] {
+.convo-item:hover { background: var(--ink-2) !important; }
+
+/* Currently selected (visited) — subtle, not acid. Acid is reserved for LIVE. */
+.convo-item.selected {
   background: var(--ink-3) !important;
-  box-shadow: inset 2px 0 0 var(--acid), inset 0 -1px 0 var(--rule-0);
+  box-shadow: inset 0 -1px 0 var(--rule-0) !important;
 }
+.convo-item.selected .convo-title { color: var(--paper-0) !important; }
+
+/* Status left-rail — each class gets its own coloured hairline */
+.convo-item.session_active { box-shadow: inset 2px 0 0 var(--acid), inset 0 -1px 0 var(--rule-0) !important; }
+.convo-item.in_progress     { box-shadow: inset 2px 0 0 var(--amber), inset 0 -1px 0 var(--rule-0) !important; }
+.convo-item.waiting_for_user{ box-shadow: inset 2px 0 0 var(--azure), inset 0 -1px 0 var(--rule-0) !important; }
+.convo-item.error           { box-shadow: inset 2px 0 0 var(--flame), inset 0 -1px 0 var(--rule-0) !important; }
+/* session_active + selected keeps the acid bar */
+.convo-item.session_active.selected {
+  background: var(--ink-3) !important;
+  box-shadow: inset 2px 0 0 var(--acid), inset 0 -1px 0 var(--rule-0) !important;
+}
+
+/* Title row — no vertical stack, no margins */
+.convo-item-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.convo-item-row:hover { background: transparent !important; }
 
 .convo-title, .convo-title-input {
   font-family: var(--ff-ui) !important;
@@ -174,17 +203,122 @@
   font-weight: var(--w-mid) !important;
   color: var(--paper-0) !important;
   letter-spacing: var(--track-tight) !important;
+  line-height: 1.25 !important;
 }
 
-.convo-summary, .convo-meta, .convo-meta-item {
+/* Meta tag row — tight, same column as title (no extra padding-left) */
+.convo-meta-tags {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding-left: 16px !important;   /* keeps it indented under the dot */
+  margin-top: 0 !important;
+}
+
+.convo-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding-left: 16px !important;
+  margin-top: 0 !important;
   font-family: var(--ff-ui) !important;
-  font-size: 11px !important;
+  font-size: 10.5px !important;
   color: var(--paper-3) !important;
 }
+.convo-meta-item { font-size: 10.5px !important; color: var(--paper-3) !important; }
+.convo-meta-sep {
+  display: inline-block; width: 1px; height: 9px;
+  background: var(--rule-1);
+}
+
+.convo-summary {
+  font-family: var(--ff-ui) !important;
+  font-size: 11px !important;
+  color: var(--paper-2) !important;
+  padding-left: 16px !important;
+  line-height: 1.4;
+}
+
 .convo-session-id {
   font-family: var(--ff-mono) !important;
   font-variant-numeric: tabular-nums;
+  font-size: 10.5px !important;
   color: var(--paper-3) !important;
+  letter-spacing: 0 !important;
+}
+
+/* ── Mode chip ($_ Terminal, [] Process) — kill the old purple ── */
+.convo-mode-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 16px !important;
+  padding: 0 7px !important;
+  font-family: var(--ff-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 9.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: var(--track-wide) !important;
+  text-transform: uppercase !important;
+  background: var(--ink-0) !important;
+  color: var(--paper-2) !important;
+  border: none !important;
+  border-radius: var(--r-1) !important;
+  box-shadow: var(--shadow-inset-hairline) !important;
+  line-height: 1 !important;
+}
+.convo-mode-badge.terminal {
+  color: var(--paper-2) !important;
+  background: var(--ink-0) !important;
+  box-shadow: inset 0 0 0 0.5px var(--rule-2) !important;
+}
+.convo-mode-badge.process {
+  color: var(--paper-2) !important;
+  background: var(--ink-0) !important;
+  box-shadow: inset 0 0 0 0.5px var(--rule-1) !important;
+}
+/* When its parent row is session_active — bump the chip to acid */
+.convo-item.session_active .convo-mode-badge.terminal,
+.convo-item.session_active .convo-mode-badge.process {
+  color: var(--acid) !important;
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--acid) 50%, transparent) !important;
+  background: color-mix(in srgb, var(--acid) 7%, var(--ink-0)) !important;
+}
+
+/* ── Status indicator dot ── */
+.status-indicator {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  background: var(--paper-4) !important;
+}
+.status-indicator.session_active {
+  background: var(--acid) !important;
+  box-shadow: 0 0 0 0 var(--acid-glow);
+  animation: opLivePulse 2s var(--ease-editorial) infinite;
+}
+.status-indicator.in_progress  { background: var(--amber) !important; animation: opLivePulse 1.2s var(--ease-editorial) infinite; }
+.status-indicator.waiting_for_user { background: var(--azure) !important; }
+.status-indicator.completed    { background: var(--mint) !important; }
+.status-indicator.error        { background: var(--flame) !important; }
+.status-indicator.local        { background: var(--paper-3) !important; }
+
+/* Delete button inside convo — show only on hover */
+.convo-delete-btn {
+  background: transparent !important;
+  border: none !important;
+  color: var(--paper-3) !important;
+  padding: 2px !important;
+  border-radius: var(--r-1) !important;
+  opacity: 0 !important;
+  cursor: pointer;
+  transition: opacity var(--dur-quick) var(--ease-snap), color var(--dur-quick) var(--ease-snap) !important;
+}
+.convo-item:hover .convo-delete-btn { opacity: 1 !important; }
+.convo-delete-btn:hover {
+  color: var(--flame) !important;
+  background: color-mix(in srgb, var(--flame) 10%, transparent) !important;
 }
 
 /* Queue count badge */
