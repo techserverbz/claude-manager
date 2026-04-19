@@ -4,6 +4,7 @@ import fs from "fs";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { AutoMigrationSystem } from "./auto-migration-system.js";
+import { BrainManager } from "./brain-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -44,6 +45,21 @@ export class Database {
       }
     } catch (err) {
       console.error("[DB] Auto-migration error:", err.message);
+    }
+
+    // Seed built-in Personal brain (idempotent)
+    try {
+      await this._seedPersonalBrain();
+    } catch (err) {
+      console.error("[DB] Personal brain seed error:", err.message);
+    }
+
+    // One-shot: migrate legacy agent memories → Personal wiki (guarded by sentinel)
+    try {
+      const brainManager = new BrainManager(this);
+      await brainManager.migrateLegacyAgentMemoriesToPersonalWiki();
+    } catch (err) {
+      console.error("[DB] Legacy memory migration error:", err.message);
     }
 
     // Backup on startup (only for embedded)
@@ -283,6 +299,32 @@ export class Database {
     } catch (err) {
       console.error("[DB] Schema error:", err.message);
     }
+  }
+
+  async _seedPersonalBrain() {
+    // Personal brain = ~/.claude/ (built-in, always active by default)
+    const claudeHome = path.join(process.env.USERPROFILE || process.env.HOME, ".claude");
+
+    // Upsert: insert if not there, do not overwrite existing row's claude_path or is_active
+    await this.pool.query(
+      `INSERT INTO brains (name, type, claude_path, is_builtin, is_active)
+       VALUES ($1, 'personal', $2, TRUE, TRUE)
+       ON CONFLICT (name) DO UPDATE SET is_builtin = TRUE
+       `,
+      ["Personal", claudeHome]
+    );
+
+    // Ensure at least one brain is active: if no brain has is_active = TRUE, flip Personal on
+    const { rows } = await this.pool.query(
+      "SELECT COUNT(*)::int AS active_count FROM brains WHERE is_active = TRUE"
+    );
+    if (rows[0].active_count === 0) {
+      await this.pool.query(
+        "UPDATE brains SET is_active = TRUE WHERE name = 'Personal'"
+      );
+    }
+
+    console.log("[DB] Personal brain ready");
   }
 
   async _backupDbOnStartup() {

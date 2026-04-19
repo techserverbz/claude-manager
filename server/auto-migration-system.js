@@ -48,8 +48,21 @@ export class AutoMigrationSystem {
         entity_type: { type: 'TEXT' },
         summary: { type: 'TEXT', nullable: true },
         agent: { type: 'TEXT', default: "'coding'" },
+        brain_id: { type: 'UUID', nullable: true },       // ← brain this memory belongs to
+        wiki_path: { type: 'TEXT', nullable: true },      // ← relative path inside {claude_path}/wiki/wiki/
+        category: { type: 'TEXT', nullable: true },       // ← codebases|people|decisions|...
         last_updated: { type: 'TIMESTAMPTZ', default: 'NOW()' },
         metadata: { type: 'JSONB', default: "'{}'::jsonb" }
+      },
+
+      brains: {
+        id: { type: 'UUID', default: 'gen_random_uuid()', primary: true },
+        name: { type: 'TEXT', unique: true },
+        type: { type: 'TEXT', default: "'service'", check: "type IN ('personal','service')" },
+        claude_path: { type: 'TEXT' },
+        is_active: { type: 'BOOLEAN', default: 'FALSE' },
+        is_builtin: { type: 'BOOLEAN', default: 'FALSE' },
+        created_at: { type: 'TIMESTAMPTZ', default: 'NOW()' }
       },
 
       memory_connections: {

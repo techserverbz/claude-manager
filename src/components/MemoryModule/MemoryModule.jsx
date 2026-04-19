@@ -1,164 +1,237 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import "./MemoryModule.css";
+import AddBrainModal from "./AddBrainModal.jsx";
 
-const TYPE_COLORS = { project: "#7c6aef", feedback: "#eab308", user: "#22c55e", reference: "#58a6ff" };
-const TYPE_ICONS = { project: "\u{1F4CB}", feedback: "\u{1F4AC}", user: "\u{1F464}", reference: "\u{1F517}" };
+const TYPE_COLORS = { project: "#7c6aef", feedback: "#eab308", user: "#22c55e", reference: "#58a6ff", page: "#94a3b8" };
+const TYPE_ICONS = { project: "\u{1F4CB}", feedback: "\u{1F4AC}", user: "\u{1F464}", reference: "\u{1F517}", page: "\u{1F4C4}" };
+const CATEGORY_EMOJI = {
+  codebases: "\u{1F4C1}", business: "\u{1F4BC}", people: "\u{1F464}", decisions: "\u{2696}\u{FE0F}",
+  ideas: "\u{1F4A1}", patterns: "\u{1F517}", systems: "\u{2699}\u{FE0F}", tools: "\u{1F6E0}\u{FE0F}",
+  research: "\u{1F50D}", meetings: "\u{1F4C5}", clients: "\u{1F91D}", finance: "\u{1F4B0}", credentials: "\u{1F511}"
+};
+
+const PLANNER_FILES = ["tasks.md", "short-term.md", "reminders.md", "calendar.md"];
 
 export default function MemoryModule({ onClose }) {
-  const [entities, setEntities] = useState([]);
-  const [localFiles, setLocalFiles] = useState([]);
-  const [selectedEntity, setSelectedEntity] = useState(null);
-  const [selectedContent, setSelectedContent] = useState(null);
-  const [filter, setFilter] = useState("all");
+  const [brains, setBrains] = useState([]);
+  const [activeBrain, setActiveBrain] = useState(null);
+  const [view, setView] = useState("pages"); // "hot" | "pages" | "planner" | "raw" | "skills"
+  const [hotContent, setHotContent] = useState("");
+  const [pages, setPages] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [plannerFile, setPlannerFile] = useState("tasks.md");
+  const [plannerContent, setPlannerContent] = useState("");
+  const [plannerDirty, setPlannerDirty] = useState(false);
+  const [skills, setSkills] = useState([]);
+  const [selectedPage, setSelectedPage] = useState(null);
+  const [selectedContent, setSelectedContent] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("entities"); // "entities" | "files" | "daily"
-  const [dailyNotes, setDailyNotes] = useState(null);
-  const [dailyDate, setDailyDate] = useState("");
-  const [dailyMemories, setDailyMemories] = useState([]);
-  const [agentFilter, setAgentFilter] = useState("all");
-  const [agentsList, setAgentsList] = useState([]);
-  const [sharedFiles, setSharedFiles] = useState([]);
+  const [showAddBrain, setShowAddBrain] = useState(false);
+  const [syncState, setSyncState] = useState("");
 
-  const fetchEntities = useCallback(async () => {
-    try {
-      const res = await fetch("/api/memory/entities");
-      setEntities(await res.json());
-    } catch {} finally { setLoading(false); }
-  }, []);
+  // --- fetchers ---
 
-  const fetchLocalFiles = useCallback(async () => {
+  const fetchBrains = useCallback(async () => {
     try {
-      // Fetch files from all agents
-      let agents = agentsList;
-      if (agents.length === 0) {
-        try { const r = await fetch("/api/agents"); agents = await r.json(); } catch {}
-      }
-      const allFiles = [];
-      for (const a of agents) {
-        const res = await fetch(`/api/memory/list?agent=${a.name}`);
-        const data = await res.json();
-        if (Array.isArray(data)) allFiles.push(...data);
-      }
-      setLocalFiles(allFiles);
-    } catch {}
-  }, [agentsList]);
-
-  const fetchDaily = useCallback(async () => {
-    // Fetch daily notes only if date is selected
-    if (dailyDate) {
-      try {
-        const res = await fetch(`/api/memory/daily/${dailyDate}`);
-        const data = await res.json();
-        setDailyNotes(data?.content || null);
-      } catch { setDailyNotes(null); }
-    } else {
-      setDailyNotes(null);
-    }
-    // Fetch memories from all agents — filter by date if selected
-    try {
-      // Get agents dynamically if agentsList hasn't loaded yet
-      let agents = agentsList;
-      if (agents.length === 0) {
-        try {
-          const r = await fetch("/api/agents");
-          agents = await r.json();
-        } catch {}
-      }
-      const allMems = [];
-      for (const a of agents) {
-        const dateParam = dailyDate ? `&date=${dailyDate}` : "";
-        const res = await fetch(`/api/memory/list?agent=${a.name}${dateParam}`);
-        const mems = await res.json();
-        if (Array.isArray(mems)) allMems.push(...mems);
-      }
-      // Sort by date descending
-      allMems.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-      setDailyMemories(allMems);
-    } catch { setDailyMemories([]); }
-  }, [dailyDate, agentsList]);
-
-  const fetchSharedFiles = useCallback(async () => {
-    try {
-      const res = await fetch("/api/memory/shared");
-      setSharedFiles(await res.json());
+      const res = await fetch("/api/brains");
+      const list = await res.json();
+      setBrains(list);
+      const active = list.find(b => b.is_active) || list[0];
+      setActiveBrain(active || null);
     } catch {}
   }, []);
 
-  useEffect(() => { fetchEntities(); fetchLocalFiles(); fetchSharedFiles(); }, [fetchEntities, fetchLocalFiles, fetchSharedFiles]);
-  useEffect(() => { if (view === "daily") fetchDaily(); }, [view, fetchDaily]);
-  useEffect(() => { fetch("/api/agents").then(r => r.json()).then(setAgentsList).catch(() => {}); }, []);
-
-  const loadEntityContent = async (entity) => {
-    setSelectedEntity(entity);
-    setSelectedContent(null);
-    if (entity.file_path) {
-      try {
-        const agent = entity.agent || entity.entity_id?.split("/")[0] || "default";
-        const res = await fetch(`/api/memory/file?agent=${agent}&path=${encodeURIComponent(entity.file_path)}`);
-        const data = await res.json();
-        setSelectedContent(data?.content || entity.summary || "No content available");
-      } catch {
-        setSelectedContent(entity.summary || "No content available");
-      }
-    } else {
-      setSelectedContent(entity.summary || "No content available");
-    }
-  };
-
-  const syncMemories = async () => {
+  const fetchPages = useCallback(async (brainId) => {
+    if (!brainId) return;
     try {
-      await fetch("/api/memory/sync", { method: "POST" });
-      fetchEntities();
-      fetchLocalFiles();
+      const res = await fetch(`/api/brains/${brainId}/pages`);
+      const data = await res.json();
+      setPages(data?.pages || []);
+      setCategories(data?.categories || []);
+    } catch {}
+  }, []);
+
+  const fetchHot = useCallback(async (brainId) => {
+    if (!brainId) { setHotContent(""); return; }
+    try {
+      const res = await fetch(`/api/brains/${brainId}/hot`);
+      const data = await res.json();
+      setHotContent(data?.content || "");
+    } catch {}
+  }, []);
+
+  const fetchPlanner = useCallback(async (brainId, file) => {
+    if (!brainId) return;
+    try {
+      const res = await fetch(`/api/brains/${brainId}/planner/${file}`);
+      const data = await res.json();
+      setPlannerContent(data?.content || "");
+      setPlannerDirty(false);
+    } catch { setPlannerContent(""); }
+  }, []);
+
+  const fetchSkills = useCallback(async (brainId) => {
+    if (!brainId) return;
+    try {
+      const res = await fetch(`/api/brains/${brainId}/skills`);
+      const data = await res.json();
+      setSkills(Array.isArray(data) ? data : []);
+    } catch {}
+  }, []);
+
+  // --- effects ---
+
+  useEffect(() => { fetchBrains().finally(() => setLoading(false)); }, [fetchBrains]);
+
+  useEffect(() => {
+    if (!activeBrain) return;
+    fetchPages(activeBrain.id);
+    fetchHot(activeBrain.id);
+    fetchSkills(activeBrain.id);
+    setSelectedPage(null);
+    setSelectedContent("");
+  }, [activeBrain, fetchPages, fetchHot, fetchSkills]);
+
+  useEffect(() => {
+    if (view === "planner" && activeBrain) fetchPlanner(activeBrain.id, plannerFile);
+  }, [view, activeBrain, plannerFile, fetchPlanner]);
+
+  // --- actions ---
+
+  const activateBrain = async (id) => {
+    try {
+      await fetch(`/api/brains/${id}/activate`, { method: "POST" });
+      await fetchBrains();
     } catch {}
   };
 
-  const filtered = entities.filter(e => {
-    if (filter !== "all" && e.entity_type !== filter) return false;
-    if (agentFilter !== "all" && e.agent !== agentFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (e.entity_id || "").toLowerCase().includes(q) ||
-        (e.summary || "").toLowerCase().includes(q) ||
-        (e.entity_type || "").toLowerCase().includes(q);
-    }
-    return true;
-  });
-
-  const grouped = {};
-  for (const e of filtered) {
-    const date = e.entity_id?.match(/\d{4}-\d{2}-\d{2}/)?.[0] || "undated";
-    if (!grouped[date]) grouped[date] = [];
-    grouped[date].push(e);
-  }
-  const sortedDates = Object.keys(grouped).sort().reverse();
-
-  const stats = {
-    total: entities.length,
-    project: entities.filter(e => e.entity_type === "project").length,
-    feedback: entities.filter(e => e.entity_type === "feedback").length,
-    user: entities.filter(e => e.entity_type === "user").length,
-    reference: entities.filter(e => e.entity_type === "reference").length,
+  const openPage = async (p) => {
+    if (!activeBrain) return;
+    setSelectedPage(p);
+    setSelectedContent("Loading...");
+    try {
+      const res = await fetch(`/api/brains/${activeBrain.id}/pages/${p.category}/${p.slug}`);
+      const data = await res.json();
+      setSelectedContent(data?.content || "No content");
+    } catch { setSelectedContent("Failed to load."); }
   };
+
+  const syncWiki = async () => {
+    if (!activeBrain) return;
+    setSyncState("syncing...");
+    try {
+      const res = await fetch(`/api/brains/${activeBrain.id}/sync`, { method: "POST" });
+      const data = await res.json();
+      setSyncState(`synced ${data?.synced || 0} pages`);
+      await fetchPages(activeBrain.id);
+      setTimeout(() => setSyncState(""), 2500);
+    } catch { setSyncState("sync failed"); }
+  };
+
+  const savePlanner = async () => {
+    if (!activeBrain) return;
+    try {
+      await fetch(`/api/brains/${activeBrain.id}/planner/${plannerFile}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: plannerContent })
+      });
+      setPlannerDirty(false);
+    } catch {}
+  };
+
+  const removeBrain = async (id) => {
+    if (!window.confirm("Remove this service brain? (Wiki files on disk are untouched.)")) return;
+    try {
+      const res = await fetch(`/api/brains/${id}`, { method: "DELETE" });
+      if (res.ok) await fetchBrains();
+    } catch {}
+  };
+
+  // --- derived ---
+
+  const filteredPages = useMemo(() => {
+    return pages.filter(p => {
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return (p.name || "").toLowerCase().includes(q) ||
+          (p.excerpt || "").toLowerCase().includes(q) ||
+          (p.slug || "").toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [pages, categoryFilter, search]);
+
+  const pagesByCategory = useMemo(() => {
+    const out = {};
+    for (const p of filteredPages) {
+      if (!out[p.category]) out[p.category] = [];
+      out[p.category].push(p);
+    }
+    return out;
+  }, [filteredPages]);
+
+  const categoryStats = useMemo(() => {
+    const counts = {};
+    for (const p of pages) counts[p.category] = (counts[p.category] || 0) + 1;
+    return counts;
+  }, [pages]);
+
+  // --- render ---
 
   return (
     <div className="memory-module">
       <div className="memory-header">
         <div className="memory-header-left">
-          <h2>Memories</h2>
+          <h2>Second Brain</h2>
           <div className="memory-stats">
-            <span className="stat">{stats.total} total</span>
-            <span className="stat" style={{ color: TYPE_COLORS.project }}>{stats.project} project</span>
-            <span className="stat" style={{ color: TYPE_COLORS.feedback }}>{stats.feedback} feedback</span>
-            <span className="stat" style={{ color: TYPE_COLORS.user }}>{stats.user} user</span>
+            <select
+              className="memory-brain-select"
+              value={activeBrain?.id || ""}
+              onChange={e => activateBrain(e.target.value)}
+              style={{ padding: "4px 8px", borderRadius: 6, background: "#1e1e2e", color: "#fff", border: "1px solid #333", fontSize: 13 }}
+            >
+              {brains.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.is_builtin ? "\u{1F3E0} " : "\u{1F517} "}{b.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="stat"
+              onClick={() => setShowAddBrain(true)}
+              style={{ cursor: "pointer", background: "transparent", border: "1px dashed #555", color: "#7c6aef" }}
+            >
+              + Add Service Brain
+            </button>
+            {activeBrain && !activeBrain.is_builtin && (
+              <button
+                className="stat"
+                onClick={() => removeBrain(activeBrain.id)}
+                style={{ cursor: "pointer", background: "transparent", border: "1px solid #ef4444", color: "#ef4444" }}
+                title="Remove this service brain"
+              >
+                Remove
+              </button>
+            )}
+            <span className="stat">{pages.length} pages</span>
+            {syncState && <span className="stat" style={{ color: "#22c55e" }}>{syncState}</span>}
+            <button className="stat" onClick={syncWiki} style={{ cursor: "pointer", background: "transparent", border: "1px solid #333" }}>Sync</button>
           </div>
         </div>
         <div className="memory-header-right">
           <div className="memory-views">
-            {["entities", "files", "daily", "shared"].map(v => (
+            {[
+              ["hot", "Hot"],
+              ["pages", "Pages"],
+              ["planner", "Planner"],
+              ["skills", "Skills"]
+            ].map(([v, label]) => (
               <button key={v} className={`view-btn ${view === v ? "active" : ""}`} onClick={() => setView(v)}>
-                {v === "entities" ? "DB" : v === "files" ? "Files" : v === "daily" ? "Daily" : "Shared"}
+                {label}
               </button>
             ))}
           </div>
@@ -166,188 +239,179 @@ export default function MemoryModule({ onClose }) {
         </div>
       </div>
 
+      {activeBrain && (
+        <div style={{ padding: "6px 16px", borderBottom: "1px solid #22222e", fontSize: 11, color: "#94a3b8", background: "#15151f" }}>
+          {activeBrain.claude_path}
+        </div>
+      )}
+
       <div className="memory-body">
         <div className="memory-sidebar">
-          <input className="memory-search" placeholder="Search memories..." value={search} onChange={e => setSearch(e.target.value)} />
-          <div className="memory-filter-row">
-            <select className="memory-agent-select" value={agentFilter} onChange={e => setAgentFilter(e.target.value)}>
-              <option value="all">All Agents</option>
-              {agentsList.map(a => <option key={a.name} value={a.name}>{a.name.charAt(0).toUpperCase() + a.name.slice(1)}</option>)}
-            </select>
-            <div className="memory-type-filters">
-              {["all", "project", "feedback", "user", "reference"].map(t => (
-                <button key={t} className={`memory-type-btn ${filter === t ? "active" : ""}`}
-                  style={t !== "all" ? { "--type-color": TYPE_COLORS[t] } : {}}
-                  onClick={() => setFilter(t)}>
-                  {t !== "all" && <span className="type-dot" style={{ background: TYPE_COLORS[t] }} />}
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+          {view === "pages" && (
+            <>
+              <input className="memory-search" placeholder="Search pages..." value={search} onChange={e => setSearch(e.target.value)} />
+              <div className="memory-filter-row" style={{ flexWrap: "wrap", gap: 6 }}>
+                <button
+                  className={`memory-type-btn ${categoryFilter === "all" ? "active" : ""}`}
+                  onClick={() => setCategoryFilter("all")}
+                >
+                  All ({pages.length})
                 </button>
-              ))}
-            </div>
-          </div>
+                {categories.map(c => (
+                  <button
+                    key={c}
+                    className={`memory-type-btn ${categoryFilter === c ? "active" : ""}`}
+                    onClick={() => setCategoryFilter(c)}
+                    title={c}
+                  >
+                    <span style={{ marginRight: 4 }}>{CATEGORY_EMOJI[c] || "\u{1F4C4}"}</span>
+                    {c} ({categoryStats[c] || 0})
+                  </button>
+                ))}
+              </div>
 
-          {view === "entities" && (
-            <div className="memory-list">
-              {loading && <div className="memory-empty">Loading...</div>}
-              {!loading && filtered.length === 0 && <div className="memory-empty">No memories found</div>}
-              {sortedDates.map(date => (
-                <div key={date} className="memory-date-group">
-                  <div className="memory-date-header">{date}</div>
-                  {grouped[date].map(e => (
-                    <div key={e.id} className={`memory-item ${selectedEntity?.id === e.id ? "selected" : ""}`}
-                      onClick={() => loadEntityContent(e)}>
-                      <span className="memory-item-icon">{TYPE_ICONS[e.entity_type] || "\u{1F4C4}"}</span>
-                      <div className="memory-item-info">
-                        <div className="memory-item-name">{e.entity_id?.split("/").pop()?.replace(/-/g, " ") || "Untitled"}</div>
-                        <div className="memory-item-type" style={{ color: TYPE_COLORS[e.entity_type] }}>{e.entity_type}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {view === "files" && (
-            <div className="memory-list">
-              {(agentFilter === "all" ? localFiles : localFiles.filter(f => f.agent === agentFilter)).length === 0 && <div className="memory-empty">No files{agentFilter !== "all" ? ` for ${agentFilter}` : ""}</div>}
-              {(agentFilter === "all" ? localFiles : localFiles.filter(f => f.agent === agentFilter)).map((f, i) => {
-                const filePath = `${f.date}/${f.file}`;
-                const isSelected = selectedEntity?.file_path === filePath;
-                return (
-                  <div key={i} className={`memory-item ${isSelected ? "selected" : ""}`} onClick={async () => {
-                    setSelectedEntity({ entity_id: f.name, entity_type: f.type, agent: f.agent, file_path: filePath });
-                    setSelectedContent("Loading...");
-                    try {
-                      const res = await fetch(`/api/memory/file?agent=${f.agent || "coding"}&path=${encodeURIComponent(filePath)}`);
-                      const data = await res.json();
-                      setSelectedContent(data?.content || "No content");
-                    } catch { setSelectedContent("Failed to load file content."); }
-                  }}>
-                    <span className="memory-item-icon">{TYPE_ICONS[f.type] || "\u{1F4C4}"}</span>
-                    <div className="memory-item-info">
-                      <div className="memory-item-name">{(f.name || f.file || "").replace(/-/g, " ")}</div>
-                      <div className="memory-item-type" style={{ color: TYPE_COLORS[f.type] }}>{f.type} — {f.date}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {view === "shared" && (
-            <div className="memory-list">
-              {sharedFiles.length === 0 && <div className="memory-empty">No shared files</div>}
-              {sharedFiles.map((f, i) => {
-                const isSelected = selectedEntity?.file_path === `shared/${f.name}`;
-                return (
-                  <div key={i} className={`memory-item ${isSelected ? "selected" : ""}`} onClick={async () => {
-                    setSelectedEntity({ entity_id: f.name, entity_type: "shared", file_path: `shared/${f.name}` });
-                    setSelectedContent("Loading...");
-                    try {
-                      const res = await fetch(`/api/memory/shared/${encodeURIComponent(f.name)}`);
-                      const data = await res.json();
-                      setSelectedContent(data?.content || "No content");
-                    } catch { setSelectedContent("Failed to load."); }
-                  }}>
-                    <span className="memory-item-icon">{"\u{1F4E2}"}</span>
-                    <div className="memory-item-info">
-                      <div className="memory-item-name">{f.name.replace(/\.md$/, "")}</div>
-                      <div className="memory-item-type" style={{ color: "#58a6ff" }}>{f.size ? `${(f.size / 1024).toFixed(1)}KB` : "shared"}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {view === "daily" && (() => {
-            // Filter by agent, then group by date
-            const filteredDaily = agentFilter === "all" ? dailyMemories : dailyMemories.filter(f => f.agent === agentFilter);
-            const grouped = {};
-            for (const f of filteredDaily) {
-              const d = f.date || "undated";
-              if (!grouped[d]) grouped[d] = [];
-              grouped[d].push(f);
-            }
-            const dates = Object.keys(grouped).sort().reverse();
-            return (
               <div className="memory-list">
-                <div style={{ padding: "6px 10px", display: "flex", gap: 4 }}>
-                  <input type="date" className="memory-date-picker" value={dailyDate} onChange={e => setDailyDate(e.target.value)} style={{ flex: 1 }} />
-                  {dailyDate && <button className="memory-date-clear" onClick={() => setDailyDate("")}>&times;</button>}
-                </div>
-                {filteredDaily.length === 0 && <div className="memory-empty">{dailyDate ? `No memories for ${dailyDate}` : "No memories found"}</div>}
-                {dates.map(date => (
-                  <div key={date} className="memory-date-group">
-                    <div className="memory-date-header">{date}</div>
-                    {grouped[date].map((f, i) => {
-                      const filePath = `${f.date}/${f.file}`;
-                      const isSelected = selectedEntity?.file_path === filePath;
-                      return (
-                        <div key={i} className={`memory-item ${isSelected ? "selected" : ""}`} onClick={async () => {
-                          setSelectedEntity({ entity_id: f.name, entity_type: f.type, agent: f.agent, file_path: filePath });
-                          setSelectedContent("Loading...");
-                          try {
-                            const res = await fetch(`/api/memory/file?agent=${f.agent || "coding"}&path=${encodeURIComponent(filePath)}`);
-                            const data = await res.json();
-                            setSelectedContent(data?.content || "No content");
-                          } catch { setSelectedContent("Failed to load."); }
-                        }}>
-                          <span className="memory-item-icon">{TYPE_ICONS[f.type] || "\u{1F4C4}"}</span>
-                          <div className="memory-item-info">
-                            <div className="memory-item-name">{(f.name || f.file || "").replace(/-/g, " ")}</div>
-                            <div className="memory-item-type" style={{ color: TYPE_COLORS[f.type] }}>{f.type} — {f.agent}</div>
+                {loading && <div className="memory-empty">Loading...</div>}
+                {!loading && filteredPages.length === 0 && <div className="memory-empty">No pages</div>}
+                {Object.keys(pagesByCategory).sort().map(cat => (
+                  <div key={cat} className="memory-date-group">
+                    <div className="memory-date-header">
+                      {CATEGORY_EMOJI[cat] || "\u{1F4C1}"} {cat}
+                    </div>
+                    {pagesByCategory[cat].map(p => (
+                      <div
+                        key={`${p.category}/${p.slug}`}
+                        className={`memory-item ${selectedPage?.slug === p.slug && selectedPage?.category === p.category ? "selected" : ""}`}
+                        onClick={() => openPage(p)}
+                      >
+                        <span className="memory-item-icon">{TYPE_ICONS[p.type] || "\u{1F4C4}"}</span>
+                        <div className="memory-item-info">
+                          <div className="memory-item-name">{p.name || p.slug}</div>
+                          <div className="memory-item-type" style={{ color: "#94a3b8" }}>
+                            {(p.last_modified || "").slice(0, 10)}
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
-            );
-          })()}
+            </>
+          )}
+
+          {view === "hot" && (
+            <div className="memory-list">
+              <div className="memory-empty" style={{ fontSize: 12, padding: 8 }}>
+                Hot cache — recent context loaded at session start.
+              </div>
+            </div>
+          )}
+
+          {view === "planner" && (
+            <div className="memory-list">
+              {PLANNER_FILES.map(f => (
+                <div
+                  key={f}
+                  className={`memory-item ${plannerFile === f ? "selected" : ""}`}
+                  onClick={() => setPlannerFile(f)}
+                >
+                  <span className="memory-item-icon">📝</span>
+                  <div className="memory-item-info">
+                    <div className="memory-item-name">{f}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === "skills" && (
+            <div className="memory-list">
+              {skills.length === 0 && <div className="memory-empty">No skills in {activeBrain?.claude_path}/skills/</div>}
+              {skills.map((s, i) => (
+                <div key={i} className="memory-item">
+                  <span className="memory-item-icon">{s.type === "folder" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+                  <div className="memory-item-info">
+                    <div className="memory-item-name">{s.name}</div>
+                    <div className="memory-item-type" style={{ color: "#94a3b8" }}>{s.description?.slice(0, 60) || s.type}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="memory-detail">
-          {view === "daily" && selectedEntity ? (
+          {view === "hot" ? (
             <div className="memory-detail-content">
               <div className="memory-detail-header">
-                <h3>{selectedEntity.entity_id?.replace(/-/g, " ") || "Memory"}</h3>
+                <h3>Hot Cache</h3>
                 <div className="memory-detail-meta">
-                  {selectedEntity.entity_type && <span className="memory-detail-type" style={{ color: TYPE_COLORS[selectedEntity.entity_type], borderColor: TYPE_COLORS[selectedEntity.entity_type] }}>{selectedEntity.entity_type}</span>}
-                  {selectedEntity.agent && <span className="memory-detail-agent">{selectedEntity.agent}</span>}
+                  <span className="memory-detail-path">{activeBrain?.claude_path}/wiki/wiki/hot.md</span>
                 </div>
               </div>
-              <pre className="memory-content-text">{selectedContent || "Select a memory..."}</pre>
+              <pre className="memory-content-text">{hotContent || "(empty — run scsb to compile, or wait for the hook)"}</pre>
             </div>
-          ) : view === "daily" ? (
+          ) : view === "planner" ? (
             <div className="memory-detail-content">
               <div className="memory-detail-header">
-                <h3>Daily Notes — {dailyDate}</h3>
-              </div>
-              <pre className="memory-content-text">{dailyNotes || "No daily notes. Select a memory from the left."}</pre>
-            </div>
-          ) : selectedEntity ? (
-            <div className="memory-detail-content">
-              <div className="memory-detail-header">
-                <h3>{selectedEntity.entity_id?.split("/").pop()?.replace(/-/g, " ") || "Memory"}</h3>
+                <h3>{plannerFile}</h3>
                 <div className="memory-detail-meta">
-                  {selectedEntity.entity_type && <span className="memory-detail-type" style={{ color: TYPE_COLORS[selectedEntity.entity_type], borderColor: TYPE_COLORS[selectedEntity.entity_type] }}>{selectedEntity.entity_type}</span>}
-                  {selectedEntity.agent && <span className="memory-detail-agent">{selectedEntity.agent}</span>}
-                  {selectedEntity.file_path && <span className="memory-detail-path">{selectedEntity.file_path}</span>}
+                  <span className="memory-detail-path">{activeBrain?.claude_path}/wiki/{plannerFile}</span>
+                  {plannerDirty && <span className="stat" style={{ color: "#eab308" }}>unsaved</span>}
+                  <button
+                    className="stat"
+                    onClick={savePlanner}
+                    disabled={!plannerDirty}
+                    style={{ cursor: plannerDirty ? "pointer" : "default", background: plannerDirty ? "#22c55e" : "#333", color: "#fff", border: 0 }}
+                  >Save</button>
                 </div>
               </div>
-              <pre className="memory-content-text">{selectedContent || "Loading..."}</pre>
+              <textarea
+                className="memory-content-text"
+                value={plannerContent}
+                onChange={e => { setPlannerContent(e.target.value); setPlannerDirty(true); }}
+                style={{ width: "100%", height: "100%", background: "#0f0f17", color: "#e2e8f0", border: "1px solid #22222e", borderRadius: 6, padding: 12, fontFamily: "Consolas, monospace", fontSize: 13, resize: "none" }}
+              />
+            </div>
+          ) : view === "pages" && selectedPage ? (
+            <div className="memory-detail-content">
+              <div className="memory-detail-header">
+                <h3>{selectedPage.name || selectedPage.slug}</h3>
+                <div className="memory-detail-meta">
+                  <span className="memory-detail-type" style={{ color: "#7c6aef", borderColor: "#7c6aef" }}>{selectedPage.category}</span>
+                  <span className="memory-detail-path">wiki/{selectedPage.category}/{selectedPage.slug}.md</span>
+                </div>
+              </div>
+              <pre className="memory-content-text">{selectedContent}</pre>
+            </div>
+          ) : view === "skills" ? (
+            <div className="memory-detail-content">
+              <div className="memory-detail-header">
+                <h3>Skills — {activeBrain?.name}</h3>
+                <div className="memory-detail-meta">
+                  <span className="memory-detail-path">{activeBrain?.claude_path}/skills/</span>
+                </div>
+              </div>
+              <pre className="memory-content-text">{skills.length === 0 ? "(no skills found in this brain's skills/ folder)" : skills.map(s => `${s.type === "folder" ? "📁" : "📄"} ${s.name}${s.description ? ` — ${s.description.trim().slice(0, 120)}` : ""}`).join("\n\n")}</pre>
             </div>
           ) : (
             <div className="memory-empty-detail">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
-              <p>Select a memory to view details</p>
+              <p>Select a page to view</p>
             </div>
           )}
         </div>
       </div>
+
+      {showAddBrain && (
+        <AddBrainModal
+          onClose={() => setShowAddBrain(false)}
+          onAdded={async () => {
+            setShowAddBrain(false);
+            await fetchBrains();
+          }}
+        />
+      )}
     </div>
   );
 }

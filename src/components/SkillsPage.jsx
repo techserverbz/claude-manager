@@ -8,11 +8,49 @@ export default function SkillsPage({ onClose }) {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null); // skill name being deleted
   const [confirmDelete, setConfirmDelete] = useState(null); // skill name pending confirm
+  const [brains, setBrains] = useState([]);
+  const [selectedBrainId, setSelectedBrainId] = useState(""); // "" = use /api/skills (built-in Personal)
+  const [selectedBrain, setSelectedBrain] = useState(null);
 
   const fetchSkills = useCallback(async () => {
-    try { const r = await fetch("/api/skills"); if (r.ok) setSkills(await r.json()); } catch {}
+    try {
+      // If a non-personal service brain is selected, read from brain endpoint
+      if (selectedBrainId && selectedBrain && !selectedBrain.is_builtin) {
+        const r = await fetch(`/api/brains/${selectedBrainId}/skills`);
+        if (r.ok) {
+          const items = await r.json();
+          // Normalize brain skill shape to skills-page shape
+          setSkills(items.map(s => ({
+            name: s.name,
+            description: s.description || "",
+            fileCount: s.type === "folder" ? "—" : 1,
+            readonly: true,   // can't create/delete under a service brain from here
+            path: s.path
+          })));
+          return;
+        }
+      }
+      // Default: use existing /api/skills (Personal brain or built-in skills)
+      const r = await fetch("/api/skills");
+      if (r.ok) setSkills(await r.json());
+    } catch {}
+  }, [selectedBrainId, selectedBrain]);
+
+  const fetchBrains = useCallback(async () => {
+    try {
+      const r = await fetch("/api/brains");
+      if (r.ok) {
+        const list = await r.json();
+        setBrains(list);
+      }
+    } catch {}
   }, []);
 
+  useEffect(() => { fetchBrains(); }, [fetchBrains]);
+  useEffect(() => {
+    const b = brains.find(x => x.id === selectedBrainId);
+    setSelectedBrain(b || null);
+  }, [selectedBrainId, brains]);
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
 
   const handleCreate = async (e) => {
@@ -83,20 +121,41 @@ export default function SkillsPage({ onClose }) {
   }
 
   // Skills list
+  const isServiceBrain = selectedBrain && !selectedBrain.is_builtin;
   return (
     <div className="sp-root">
       <div className="sp-header">
         <h2 className="sp-title">Skills</h2>
         <div className="sp-header-actions">
-          <button className="sp-add-btn" onClick={() => setShowForm(!showForm)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            Add Skill
-          </button>
+          {brains.length > 0 && (
+            <select
+              value={selectedBrainId}
+              onChange={e => setSelectedBrainId(e.target.value)}
+              className="sp-brain-select"
+              title="View skills from a specific brain"
+            >
+              <option value="">🏠 Personal (built-in)</option>
+              {brains.filter(b => !b.is_builtin).map(b => (
+                <option key={b.id} value={b.id}>🔗 {b.name}</option>
+              ))}
+            </select>
+          )}
+          {!isServiceBrain && (
+            <button className="sp-add-btn" onClick={() => setShowForm(!showForm)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              Add Skill
+            </button>
+          )}
           <button className="sp-close" onClick={onClose}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
       </div>
+      {isServiceBrain && (
+        <div style={{ padding: "8px 20px", background: "#15151f", borderBottom: "1px solid #22222e", fontSize: 11, color: "#94a3b8" }}>
+          Viewing skills from <code>{selectedBrain?.claude_path}/skills/</code> (read-only — manage service brain skills in the Services wiki)
+        </div>
+      )}
 
       <div className="sp-scroll">
         {showForm && (
@@ -135,23 +194,25 @@ export default function SkillsPage({ onClose }) {
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sp-card-arrow"><polyline points="9 18 15 12 9 6" /></svg>
               </div>
-              <div className="sp-card-actions">
-                {confirmDelete === skill.name ? (
-                  <>
-                    <span className="sp-confirm-text">Delete?</span>
-                    <button className="sp-confirm-yes" onClick={() => handleDelete(skill.name)} disabled={deleting === skill.name}>
-                      {deleting === skill.name ? "..." : "Yes"}
+              {!isServiceBrain && (
+                <div className="sp-card-actions">
+                  {confirmDelete === skill.name ? (
+                    <>
+                      <span className="sp-confirm-text">Delete?</span>
+                      <button className="sp-confirm-yes" onClick={() => handleDelete(skill.name)} disabled={deleting === skill.name}>
+                        {deleting === skill.name ? "..." : "Yes"}
+                      </button>
+                      <button className="sp-confirm-no" onClick={() => setConfirmDelete(null)}>No</button>
+                    </>
+                  ) : (
+                    <button className="sp-delete-btn" onClick={(e) => { e.stopPropagation(); setConfirmDelete(skill.name); }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+                      </svg>
                     </button>
-                    <button className="sp-confirm-no" onClick={() => setConfirmDelete(null)}>No</button>
-                  </>
-                ) : (
-                  <button className="sp-delete-btn" onClick={(e) => { e.stopPropagation(); setConfirmDelete(skill.name); }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
-                    </svg>
-                  </button>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -167,6 +228,8 @@ export default function SkillsPage({ onClose }) {
         .sp-back:hover { color:var(--text-primary); border-color:var(--border-secondary); }
         .sp-close { background:none; border:1px solid var(--border); border-radius:var(--radius-md); color:var(--text-muted); width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .15s; }
         .sp-close:hover { color:var(--text-primary); border-color:var(--border-secondary); }
+        .sp-brain-select { padding:6px 10px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius-md); color:var(--text-primary); font-size:12px; font-family:var(--font-sans); cursor:pointer; outline:none; }
+        .sp-brain-select:hover { border-color:var(--border-secondary); }
         .sp-add-btn { display:flex; align-items:center; gap:6px; padding:6px 14px; background:var(--accent-muted); border:1px solid var(--accent); border-radius:var(--radius-md); color:var(--accent-light); font-size:12px; font-weight:500; font-family:var(--font-sans); cursor:pointer; transition:all .15s; }
         .sp-add-btn:hover { background:var(--accent-glow); }
         .sp-scroll { flex:1; overflow-y:auto; padding:20px; }

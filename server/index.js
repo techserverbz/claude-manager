@@ -12,6 +12,7 @@ import { SessionReader } from "./session-reader.js";
 import { ScreenshotService } from "./screenshot.js";
 import { Database } from "./db.js";
 import { MemoryManager } from "./memory-manager.js";
+import { BrainManager, WIKI_CATEGORY_LIST } from "./brain-manager.js";
 import { createTaskRouter } from "./task-routes.js";
 import { createCrmProxyRouter } from "./crm-proxy.js";
 
@@ -67,30 +68,34 @@ const db = new Database({
 await db.initialize();
 const screenshotService = new ScreenshotService();
 const memoryManager = new MemoryManager(db);
+const brainManager = new BrainManager(db);
 const claudeManager = new ClaudeManager(ROOT, db, memoryManager);
 const terminalManager = new TerminalManager(ROOT, db);
 const sessionReader = new SessionReader();
 app.use("/api/tasks", createTaskRouter(db, io, memoryManager));
 app.use("/api/crm", createCrmProxyRouter());
 
-// Christopher config — multi-agent aware
-function getChristopherConfig() {
+// Christopher config — brain-aware (agents are chat-only now)
+async function getChristopherConfig() {
   const configPath = path.join(process.env.USERPROFILE || process.env.HOME, ".claude", "christopher-config.json");
   let saved = {};
   try { if (fs.existsSync(configPath)) saved = JSON.parse(fs.readFileSync(configPath, "utf-8")); } catch {}
 
   const mode = memoryManager.getMode();
   const ctx = memoryManager.loadFullContext();
-  const cliMemories = memoryManager.loadCliMemories();
-  const CLAUDE_HOME_PATH = path.join(process.env.USERPROFILE || process.env.HOME, ".claude").replace(/\\/g, "/");
+  const activeBrain = await brainManager.getActiveBrain().catch(() => null);
+  const hotCache = activeBrain ? brainManager.readHot(activeBrain) : "";
+  const brainName = activeBrain?.name || "Personal";
+  const brainPath = activeBrain?.claude_path || path.join(process.env.USERPROFILE || process.env.HOME, ".claude");
+  const CLAUDE_HOME_PATH = brainPath.replace(/\\/g, "/");
 
   return {
     id: "christopher",
-    name: `Christopher (${mode})`,
+    name: `Christopher (${mode} · ${brainName})`,
     model: saved.model || "claude-opus-4-6",
     skipPermissions: true,
     workingDirectory: "C:/Users/Shubham(Code)",
-    systemPrompt: `You are Christopher, a personal AI system for Shubham Bhole. You are currently in **${mode.toUpperCase()}** mode.
+    systemPrompt: `You are Christopher, a personal AI system for Shubham Bhole. Chat agent: **${mode.toUpperCase()}**. Active brain: **${brainName}**.
 
 ${ctx.identity || ""}
 
@@ -110,30 +115,36 @@ When the user asks you to do something, just do it without excessive explanation
 
 IMPORTANT: You CANNOT edit your own source code.
 
-## Memory System (Multi-Agent)
-- Current agent: ${mode}
-- WRITE memories to: ${CLAUDE_HOME_PATH}/agents/${mode}/memory/YYYY-MM-DD/{slug}.md
-- READ from ALL agents: ${CLAUDE_HOME_PATH}/agents/coding/memory/ AND ${CLAUDE_HOME_PATH}/agents/personal/memory/
-- Shared context: ${CLAUDE_HOME_PATH}/shared/ (SOUL.md, USER.md, TOOLS.md)
-- Memory format: frontmatter with name, type, agent, date, time
-- After saving: curl -s -X POST http://localhost:${APP_PORT}/api/memory/sync
+## Memory System (Brain-Based — Karpathy Wiki)
+- Active brain: **${brainName}** at ${CLAUDE_HOME_PATH}
+- Agents (coding/personal) are for chat organization only. Memory lives in the brain's wiki.
+- WRITE memory pages to: ${CLAUDE_HOME_PATH}/wiki/wiki/{category}/{slug}.md
+  Categories: ${WIKI_CATEGORY_LIST.join(", ")}
+- Raw session logs (auto): ${CLAUDE_HOME_PATH}/wiki/raw/{YYYY-MM-DD-HH-MM}.md
+- Planner: ${CLAUDE_HOME_PATH}/wiki/{tasks,reminders,calendar,short-term}.md
+- Skills: ${CLAUDE_HOME_PATH}/skills/
+- Frontmatter: name, type, brain, category, (optional) source, time
+- After writing: curl -s -X POST http://localhost:${APP_PORT}/api/memory/sync
+
+## Hot Cache (last ~500 words of recent context for this brain)
+${hotCache ? hotCache.slice(0, 3000) : "(empty — compile with scsb or wait for the hook to populate)"}
 
 ## APIs (http://localhost:${APP_PORT})
-- Mode: GET/POST /api/mode
+- Active brain: GET /api/brains/active
+- List brains: GET /api/brains
+- Save memory: POST /api/memory/save  body: { name, category, content, brainId? }
+- Sync memory from wiki → DB: POST /api/memory/sync
+- List memory entities: GET /api/memory/entities (filtered to active brain)
+- Brain pages: GET /api/brains/:id/pages?category=
+- Brain planner: GET/POST /api/brains/:id/planner/:file
+- Brain skills: GET /api/brains/:id/skills
+- Shortcut: POST /api/brain/disb|sisb|scsb|slsb|srsb  body: { text?|query? }
 - Tasks: GET/POST /api/tasks
-- Memory entities: GET /api/memory/entities
-- Save memory: POST /api/memory/save
-- List memories: GET /api/memory/list?agent=${mode}&date=YYYY-MM-DD
-- Daily notes: GET/POST /api/memory/daily/YYYY-MM-DD
-- Sync memory: POST /api/memory/sync
-- Brain context: GET /api/brain/context
 
 ## Chrome — NEVER KILL OR RESTART
 NEVER run taskkill on chrome.exe. NEVER kill Chrome instances. The user may be working in Chrome.
 Chrome DevTools MCP connects via CDP on port 9222 using --user-data-dir=C:/Users/Shubham(Code)/ChromeDebug.
 Do NOT launch Chrome yourself — it's already running. Use chrome-devtools-mcp tools to interact with browser.
-
-${cliMemories ? `\n## CLI Memories (legacy)\n${cliMemories}` : ""}
 
 CRITICAL: You ARE running inside Christopher's server on port ${APP_PORT} (DB: Supabase cloud). NEVER kill port ${APP_PORT}. NEVER run taskkill on port ${APP_PORT}.`,
   };
@@ -253,8 +264,8 @@ app.put("/api/settings/playwright", (req, res) => {
 
 // --- Model Settings ---
 
-app.get("/api/settings/model", (req, res) => {
-  const config = getChristopherConfig();
+app.get("/api/settings/model", async (req, res) => {
+  const config = await getChristopherConfig();
   res.json({ model: config.model });
 });
 
@@ -538,8 +549,8 @@ app.get("/api/sessions/:sessionId/info", (req, res) => {
 });
 
 // Get Christopher config
-app.get("/api/config", (req, res) => {
-  res.json(getChristopherConfig());
+app.get("/api/config", async (req, res) => {
+  res.json(await getChristopherConfig());
 });
 
 // Create or get the Master Chat
@@ -583,7 +594,7 @@ app.post("/api/conversations", async (req, res) => {
 app.post("/api/conversations/:id/start-session", async (req, res) => {
   try {
     const conversationId = req.params.id;
-    const agentConfig = getChristopherConfig();
+    const agentConfig = await getChristopherConfig();
 
     // Update conversation status to in_progress
     await db.query(
@@ -1061,7 +1072,7 @@ app.post("/api/conversations/:id/dispatch", async (req, res) => {
     io.emit("queue:update", { conversationId, status: "in_progress", summary: "" });
 
     const isMaster = meta.master === true;
-    const agentConfig = isMaster ? getMasterChatConfig() : getChristopherConfig();
+    const agentConfig = isMaster ? getMasterChatConfig() : await getChristopherConfig();
     if (isMaster) keepAliveConversations.add(conversationId);
 
     const useKeepAlive = keepAliveConversations.has(conversationId);
@@ -1314,10 +1325,186 @@ app.get("/api/screenshots", async (req, res) => {
   }
 });
 
-// --- Memory API ---
+// --- Brain API (new) ---
+
+app.get("/api/brains", async (req, res) => {
+  try {
+    const brains = await brainManager.listBrains();
+    res.json(brains);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/brains/active", async (req, res) => {
+  try {
+    const brain = await brainManager.getActiveBrain();
+    res.json(brain);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/brains", async (req, res) => {
+  try {
+    const { name, claude_path, initIfMissing } = req.body || {};
+    const brain = await brainManager.addBrain({ name, claude_path, initIfMissing: !!initIfMissing });
+    res.json(brain);
+  } catch (err) {
+    if (err.code === "NEEDS_INIT") {
+      return res.status(409).json({ error: err.message, needsInit: true, claude_path: err.claude_path });
+    }
+    if (err.code === "FOLDER_NOT_FOUND") {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/brains/:id", async (req, res) => {
+  try {
+    const result = await brainManager.removeBrain(req.params.id);
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post("/api/brains/:id/activate", async (req, res) => {
+  try {
+    const brain = await brainManager.setActiveBrain(req.params.id);
+    res.json(brain);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/hot", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    res.json({ content: brainManager.readHot(brain) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/index", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    res.json({ content: brainManager.readIndex(brain) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/log", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    res.json({ content: brainManager.readLog(brain) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/pages", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    const { category } = req.query;
+    res.json({
+      brain: { id: brain.id, name: brain.name, claude_path: brain.claude_path },
+      categories: WIKI_CATEGORY_LIST,
+      pages: brainManager.listPages(brain, category || null)
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/pages/:category/:slug", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    const page = brainManager.readPage(brain, req.params.category, req.params.slug);
+    if (!page) return res.status(404).json({ error: "page not found" });
+    res.json(page);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/brains/:id/pages/:category/:slug", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    const { frontmatter, body } = req.body || {};
+    const result = brainManager.writePage(brain, req.params.category, req.params.slug, frontmatter || {}, body || "");
+    res.json({ ok: true, ...result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/planner/:file", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    res.json({ content: brainManager.readPlanner(brain, req.params.file) });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post("/api/brains/:id/planner/:file", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    const { content } = req.body || {};
+    if (typeof content !== "string") return res.status(400).json({ error: "content (string) required" });
+    const result = brainManager.writePlanner(brain, req.params.file, content);
+    res.json({ ok: true, ...result });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get("/api/brains/:id/skills", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    res.json(brainManager.listSkills(brain));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/brains/:id/sync", async (req, res) => {
+  try {
+    const brain = await brainManager.getBrainById(req.params.id);
+    if (!brain) return res.status(404).json({ error: "brain not found" });
+    const count = await brainManager.syncFromWiki(brain);
+    res.json({ ok: true, synced: count });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Shortcut endpoints — operate on active brain
+app.post("/api/brain/:action", async (req, res) => {
+  try {
+    const brain = await brainManager.getActiveBrain();
+    if (!brain) return res.status(404).json({ error: "no active brain" });
+
+    const { action } = req.params;
+    const { text, query } = req.body || {};
+
+    switch (action) {
+      case "disb":
+        if (!text) return res.status(400).json({ error: "text required" });
+        return res.json(await brainManager.disb(brain, text));
+      case "sisb":
+        if (!query) return res.status(400).json({ error: "query required" });
+        return res.json(await brainManager.sisb(brain, query));
+      case "scsb":
+        return res.json(await brainManager.scsb(brain));
+      case "slsb":
+        return res.json(await brainManager.slsb(brain));
+      case "srsb":
+        return res.json(await brainManager.srsb(brain));
+      default:
+        return res.status(400).json({ error: `unknown action: ${action}` });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- Memory API (brain-aware) ---
 
 app.get("/api/memory/entities", async (req, res) => {
   try {
+    const activeBrain = await brainManager.getActiveBrain();
+    if (activeBrain) {
+      const result = await db.query(
+        "SELECT * FROM memory_entities WHERE brain_id = $1 ORDER BY last_updated DESC",
+        [activeBrain.id]
+      );
+      if (result.rows.length > 0) return res.json(result.rows);
+    }
+    // Fallback: all entities (including legacy agent-scoped rows)
     const result = await db.query("SELECT * FROM memory_entities ORDER BY last_updated DESC");
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1325,84 +1512,92 @@ app.get("/api/memory/entities", async (req, res) => {
 
 app.get("/api/memory/entities/:id", async (req, res) => {
   try {
-    const { entity, fileContent } = await memoryManager.loadEntity(req.params.id);
-    res.json({ entity, content: fileContent });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+    const { rows } = await db.query(
+      "SELECT * FROM memory_entities WHERE entity_id = $1 OR id::text = $1 LIMIT 1",
+      [req.params.id]
+    );
+    const entity = rows[0];
+    if (!entity) return res.status(404).json({ error: "entity not found" });
 
-app.post("/api/memory/entities", async (req, res) => {
-  try {
-    const { entityId, type, filePath, summary, content } = req.body;
-    if (!entityId || !type || !filePath) return res.status(400).json({ error: "entityId, type, filePath required" });
-    await memoryManager.saveEntity(entityId, { type, filePath, summary, content: content || "" });
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post("/api/memory/entities/:id/timeline", async (req, res) => {
-  try {
-    const { event } = req.body;
-    if (!event) return res.status(400).json({ error: "event required" });
-    const ok = await memoryManager.appendToTimeline(req.params.id, event);
-    res.json({ ok });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get("/api/memory/daily/:date", (req, res) => {
-  const content = memoryManager.loadDailyNote(req.params.date);
-  res.json({ date: req.params.date, content });
-});
-
-app.post("/api/memory/daily/:date", (req, res) => {
-  const { content, append } = req.body || {};
-  if (!content) return res.status(400).json({ error: "content required" });
-  if (append) {
-    memoryManager.appendToDailyNote(req.params.date, content);
-  } else {
-    memoryManager.saveDailyNote(req.params.date, content);
-  }
-  res.json({ ok: true });
-});
-
-app.get("/api/memory/connections/:id", async (req, res) => {
-  try {
-    const connections = await memoryManager.getConnections(req.params.id);
-    res.json(connections);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post("/api/memory/connections", async (req, res) => {
-  try {
-    const { from, to, type, context } = req.body;
-    if (!from || !to || !type) return res.status(400).json({ error: "from, to, type required" });
-    await memoryManager.addConnection(from, to, type, context);
-    res.json({ ok: true });
+    // Resolve file content — prefer wiki_path (brain-scoped), fall back to legacy agent path
+    let content = "";
+    if (entity.brain_id && entity.wiki_path) {
+      const brain = await brainManager.getBrainById(entity.brain_id);
+      if (brain) {
+        const full = path.join(brainManager.getWikiPagesRoot(brain), entity.wiki_path);
+        if (fs.existsSync(full)) content = fs.readFileSync(full, "utf-8");
+      }
+    } else if (entity.agent && entity.file_path) {
+      const full = path.join(process.env.USERPROFILE || process.env.HOME, ".claude", "agents", entity.agent, "memory", entity.file_path);
+      if (fs.existsSync(full)) content = fs.readFileSync(full, "utf-8");
+    }
+    res.json({ entity, content });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post("/api/memory/sync", async (req, res) => {
   try {
-    const count = await memoryManager.syncFromFiles();
-    res.json({ ok: true, synced: count });
+    const { brainId } = req.body || {};
+    const brain = brainId
+      ? await brainManager.getBrainById(brainId)
+      : await brainManager.getActiveBrain();
+    if (!brain) return res.status(404).json({ error: "no brain to sync" });
+    const count = await brainManager.syncFromWiki(brain);
+    res.json({ ok: true, synced: count, brain: brain.name });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Save memory (multi-agent aware)
-app.post("/api/memory/save", (req, res) => {
+// Save memory — writes into active brain's wiki, category-based
+app.post("/api/memory/save", async (req, res) => {
   try {
-    const { name, type, content, agent, date } = req.body;
+    const { name, content, category, type, brainId } = req.body || {};
     if (!name || !content) return res.status(400).json({ error: "name and content required" });
-    const result = memoryManager.saveMemory({ name, type, content, agent, date });
-    res.json({ ok: true, ...result });
+
+    const brain = brainId
+      ? await brainManager.getBrainById(brainId)
+      : await brainManager.getActiveBrain();
+    if (!brain) return res.status(404).json({ error: "no active brain" });
+
+    // Category fallback: infer from legacy `type`, else "research"
+    const legacyTypeMap = { project: "codebases", user: "people", feedback: "ideas", reference: "research" };
+    const cat = category || legacyTypeMap[type] || "research";
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 5);
+    const frontmatter = {
+      name,
+      type: type || "page",
+      brain: brain.name,
+      category: cat,
+      date: dateStr,
+      time: timeStr
+    };
+    const result = brainManager.writePage(brain, cat, name, frontmatter, content);
+
+    // Sync this one page
+    try { await brainManager.syncFromWiki(brain); } catch {}
+
+    res.json({ ok: true, brain: brain.name, category: cat, ...result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// List memories (multi-agent aware)
-app.get("/api/memory/list", (req, res) => {
+// Legacy /api/memory/list — return active brain's pages as memory-like entries (back-compat)
+app.get("/api/memory/list", async (req, res) => {
   try {
-    const { agent, date } = req.query;
-    const memories = memoryManager.listMemories(agent || undefined, date || undefined);
-    res.json(memories);
+    const activeBrain = await brainManager.getActiveBrain();
+    if (!activeBrain) return res.json([]);
+    const pages = brainManager.listPages(activeBrain);
+    // Map to old shape {file, date, name, type}
+    const mapped = pages.map(p => ({
+      file: `${p.slug}.md`,
+      date: (p.last_modified || "").slice(0, 10),
+      name: p.name,
+      type: p.type || "page",
+      category: p.category,
+      brain: activeBrain.name
+    }));
+    res.json(mapped);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1431,16 +1626,30 @@ app.get("/api/memory/shared/:name", (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Read a specific memory file content
-app.get("/api/memory/file", (req, res) => {
+// Read a specific memory file content — brain-aware first, legacy agent as fallback
+app.get("/api/memory/file", async (req, res) => {
   try {
-    const { agent, path: filePath } = req.query;
-    if (!filePath) return res.status(400).json({ error: "path required" });
+    const { agent, path: filePath, brainId, category, slug } = req.query;
+    if (!filePath && !(category && slug)) {
+      return res.status(400).json({ error: "path (legacy) OR category+slug required" });
+    }
+
+    // New path: brain + category/slug
+    if (category && slug) {
+      const brain = brainId
+        ? await brainManager.getBrainById(brainId)
+        : await brainManager.getActiveBrain();
+      if (!brain) return res.status(404).json({ error: "no active brain" });
+      const full = path.join(brainManager.getWikiPagesRoot(brain), category, `${slug}.md`);
+      if (!fs.existsSync(full)) return res.status(404).json({ error: "File not found" });
+      return res.json({ content: fs.readFileSync(full, "utf-8") });
+    }
+
+    // Legacy: agent+path points to agents/{agent}/memory/{path}
     const agentName = agent || memoryManager.getMode();
     const fullPath = path.join(process.env.USERPROFILE || process.env.HOME, ".claude", "agents", agentName, "memory", filePath);
     if (!fs.existsSync(fullPath)) return res.status(404).json({ error: "File not found" });
-    const content = fs.readFileSync(fullPath, "utf-8");
-    res.json({ content });
+    res.json({ content: fs.readFileSync(fullPath, "utf-8") });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1946,7 +2155,7 @@ io.on("connection", (socket) => {
       // Use master config if this is the master chat
       const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
       const isMaster = meta.master === true;
-      const agentConfig = isMaster ? getMasterChatConfig() : getChristopherConfig();
+      const agentConfig = isMaster ? getMasterChatConfig() : await getChristopherConfig();
       if (isMaster) keepAliveConversations.add(convo.id);
       const job = { text, imagePaths, convo, agentConfig };
       const q = getConvoQueue(convo.id);
@@ -1988,7 +2197,7 @@ io.on("connection", (socket) => {
       const convo = convoResult.rows[0];
       if (!convo) return;
 
-      const agentConfig = getChristopherConfig();
+      const agentConfig = await getChristopherConfig();
 
       await db.query(
         "UPDATE conversations SET status = 'in_progress', updated_at = NOW() WHERE id = $1",
@@ -2211,12 +2420,23 @@ server.listen(APP_PORT, async () => {
   // Clean up on startup
   await cleanupStaleConversations();
 
-  // Sync memory files to DB
+  // Sync active brain's wiki to DB (primary path)
+  try {
+    const activeBrain = await brainManager.getActiveBrain();
+    if (activeBrain) {
+      const synced = await brainManager.syncFromWiki(activeBrain);
+      if (synced > 0) console.log(`[Brain:${activeBrain.name}] Initial sync: ${synced} entities`);
+    }
+  } catch (err) {
+    console.error("[Brain] Sync error:", err.message);
+  }
+
+  // Also sync legacy agent memory files (for rows that pre-date brain_id — harmless if already migrated)
   try {
     const synced = await memoryManager.syncFromFiles();
-    if (synced > 0) console.log(`[Memory] Initial sync: ${synced} entities`);
+    if (synced > 0) console.log(`[Memory] Legacy agent sync: ${synced} entities`);
   } catch (err) {
-    console.error("[Memory] Sync error:", err.message);
+    console.error("[Memory] Legacy sync error:", err.message);
   }
 
   // Reconcile every 30 seconds
