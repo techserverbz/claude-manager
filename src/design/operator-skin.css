@@ -1,0 +1,335 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   OPERATOR — Global skin overrides
+   Loaded LAST. Upgrades existing component CSS in place without rewrites.
+   Lives for surfaces not yet fully redesigned.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar surface ─────────────────────────────────────────────── */
+.sidebar {
+  background: var(--ink-1) !important;
+  border-right: none !important;
+  box-shadow: inset -1px 0 0 var(--rule-1);
+  position: relative;
+}
+.sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+.sidebar > * { position: relative; z-index: 1; }
+
+.sidebar-header {
+  padding: 18px 16px 14px !important;
+  border-bottom: 1px solid var(--rule-1) !important;
+}
+.sidebar-header h3 {
+  font-family: var(--ff-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 22px !important;
+  letter-spacing: var(--track-editorial) !important;
+  color: var(--paper-0) !important;
+}
+
+/* Sidebar tabs → understated, uppercase, acid underline on active */
+.sidebar-tabs {
+  border-bottom: 1px solid var(--rule-1) !important;
+  padding: 0 8px;
+}
+.sidebar-tab {
+  font-family: var(--ff-ui) !important;
+  font-size: 10.5px !important;
+  letter-spacing: var(--track-wider) !important;
+  text-transform: uppercase;
+  font-weight: var(--w-mid) !important;
+  color: var(--paper-3) !important;
+  border-bottom-width: 1px !important;
+  padding: 12px 0 10px !important;
+}
+.sidebar-tab:hover {
+  background: transparent !important;
+  color: var(--paper-1) !important;
+}
+.sidebar-tab.active {
+  color: var(--paper-0) !important;
+  border-bottom-color: var(--acid) !important;
+  box-shadow: 0 2px 0 -1px var(--acid-glow);
+}
+
+.sidebar-filters {
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--rule-0) !important;
+}
+.sidebar-agent-select {
+  background: var(--ink-2) !important;
+  border: none !important;
+  border-radius: var(--r-1) !important;
+  box-shadow: var(--shadow-inset-hairline);
+  color: var(--paper-0) !important;
+  font-size: 11px !important;
+  font-weight: var(--w-mid);
+  padding: 7px 10px !important;
+}
+.sidebar-agent-select:focus {
+  box-shadow: inset 0 0 0 1px var(--rule-acid) !important;
+  border: none !important;
+}
+
+/* Action buttons */
+.new-chat-btn,
+.master-chat-btn,
+.tasks-btn {
+  border-radius: var(--r-1) !important;
+  font-family: var(--ff-ui) !important;
+  font-size: 12px !important;
+  font-weight: var(--w-mid) !important;
+  padding: 10px 12px !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline);
+  transition: background var(--dur-quick) var(--ease-snap),
+              box-shadow var(--dur-quick) var(--ease-snap);
+}
+.new-chat-btn {
+  background: var(--ink-2) !important;
+  color: var(--paper-1) !important;
+}
+.new-chat-btn:hover {
+  background: var(--ink-3) !important;
+  color: var(--paper-0) !important;
+  box-shadow: var(--shadow-inset-hairline-strong);
+}
+
+.master-chat-btn {
+  background: color-mix(in srgb, var(--acid) 8%, transparent) !important;
+  color: var(--acid) !important;
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--acid) 35%, transparent) !important;
+}
+.master-chat-btn:hover, .master-chat-btn.active {
+  background: color-mix(in srgb, var(--acid) 14%, transparent) !important;
+  box-shadow: var(--glow-acid) !important;
+}
+.master-chat-btn.running {
+  background: color-mix(in srgb, var(--amber) 10%, transparent) !important;
+  color: var(--amber) !important;
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--amber) 45%, transparent) !important;
+}
+
+.tasks-btn {
+  background: color-mix(in srgb, var(--amber) 8%, transparent) !important;
+  color: var(--amber) !important;
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--amber) 35%, transparent) !important;
+}
+.tasks-btn:hover {
+  background: color-mix(in srgb, var(--amber) 14%, transparent) !important;
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--amber) 60%, transparent) !important;
+}
+
+/* Section headers */
+.section-header {
+  font-family: var(--ff-ui) !important;
+  font-size: 10px !important;
+  font-weight: var(--w-mid) !important;
+  letter-spacing: var(--track-wider) !important;
+  text-transform: uppercase !important;
+  color: var(--paper-3) !important;
+  padding: 14px 16px 6px !important;
+  background: transparent !important;
+}
+
+.session-count, .local-count {
+  font-family: var(--ff-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px !important;
+  color: var(--paper-3) !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Convo items */
+.convo-item, .convo-item-row {
+  border-radius: 0 !important;
+  padding: 10px 16px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: inset 0 -1px 0 var(--rule-0);
+  transition: background var(--dur-instant) var(--ease-snap) !important;
+}
+.convo-item:hover, .convo-item-row:hover {
+  background: var(--ink-2) !important;
+}
+.convo-item.active, .convo-item-row.active,
+.convo-item[aria-selected="true"] {
+  background: var(--ink-3) !important;
+  box-shadow: inset 2px 0 0 var(--acid), inset 0 -1px 0 var(--rule-0);
+}
+
+.convo-title, .convo-title-input {
+  font-family: var(--ff-ui) !important;
+  font-size: 13px !important;
+  font-weight: var(--w-mid) !important;
+  color: var(--paper-0) !important;
+  letter-spacing: var(--track-tight) !important;
+}
+
+.convo-summary, .convo-meta, .convo-meta-item {
+  font-family: var(--ff-ui) !important;
+  font-size: 11px !important;
+  color: var(--paper-3) !important;
+}
+.convo-session-id {
+  font-family: var(--ff-mono) !important;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-3) !important;
+}
+
+/* Queue count badge */
+.queue-badge {
+  background: var(--amber) !important;
+  color: #0b0a08 !important;
+  font-family: var(--ff-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--w-strong) !important;
+  border-radius: var(--r-pill) !important;
+}
+
+/* Status dots in context menus */
+.csm-status-dot, .ctx-status-dot {
+  border-radius: 50% !important;
+}
+
+/* Mode option rows */
+.mode-option {
+  border-radius: var(--r-1) !important;
+  font-family: var(--ff-ui) !important;
+  color: var(--paper-0) !important;
+}
+.mode-option:hover {
+  background: var(--ink-3) !important;
+}
+.mode-icon {
+  font-family: var(--ff-mono) !important;
+  background: var(--ink-0) !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline);
+  color: var(--acid) !important;
+  border-radius: var(--r-1) !important;
+}
+.mode-label { color: var(--paper-0) !important; font-size: 12px !important; font-weight: var(--w-mid) !important; }
+.mode-desc { color: var(--paper-3) !important; font-size: 10.5px !important; }
+
+.mode-dropdown, .convo-context-menu, .model-context-menu {
+  background: var(--ink-2) !important;
+  border: none !important;
+  border-radius: var(--r-2) !important;
+  box-shadow: var(--shadow-pop) !important;
+  padding: 6px !important;
+}
+
+.ctx-item {
+  font-family: var(--ff-ui) !important;
+  font-size: 12px !important;
+  border-radius: var(--r-1) !important;
+  color: var(--paper-0) !important;
+}
+.ctx-item:hover { background: var(--ink-3) !important; }
+.ctx-divider { background: var(--rule-1) !important; }
+
+/* Search input */
+.sidebar-search {
+  background: var(--ink-2) !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline);
+  border-radius: var(--r-1) !important;
+  padding: 7px 10px !important;
+}
+.sidebar-search:focus-within {
+  box-shadow: inset 0 0 0 1px var(--rule-acid) !important;
+  border: none !important;
+}
+.sidebar-search-input {
+  font-size: 12px !important;
+}
+
+/* Search snippet */
+.search-snippet {
+  font-family: var(--ff-mono) !important;
+  font-size: 10.5px !important;
+  color: var(--paper-3) !important;
+}
+
+/* Model badge */
+.model-badge {
+  font-family: var(--ff-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px !important;
+  background: var(--ink-0) !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline);
+  color: var(--paper-2) !important;
+  border-radius: var(--r-1) !important;
+  padding: 2px 6px !important;
+}
+
+/* Settings modals generic */
+.convo-settings-modal {
+  background: var(--ink-1) !important;
+  border: none !important;
+  border-radius: var(--r-3) !important;
+  box-shadow: var(--shadow-pop) !important;
+}
+.convo-settings-overlay {
+  background: rgba(11, 10, 8, 0.72) !important;
+  backdrop-filter: blur(8px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(130%) !important;
+}
+.csm-title {
+  font-family: var(--ff-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 22px !important;
+  letter-spacing: var(--track-editorial) !important;
+  color: var(--paper-0) !important;
+}
+.csm-label {
+  font-family: var(--ff-ui) !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: var(--track-wider) !important;
+  color: var(--paper-3) !important;
+  font-weight: var(--w-mid) !important;
+}
+
+/* ── Chat panel / CLI panel — minimal lift ──────────────────────── */
+.chat-panel, .cli-panel {
+  background: var(--ink-0) !important;
+}
+.chat-panel input, .chat-panel textarea {
+  background: var(--ink-1) !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline);
+  border-radius: var(--r-2) !important;
+  font-family: var(--ff-ui) !important;
+}
+.chat-panel input:focus, .chat-panel textarea:focus {
+  box-shadow: inset 0 0 0 1px var(--rule-acid) !important;
+}
+
+/* ── Generic: elements with rounded corners get our radius scale ── */
+/* Don't blanket-override border-radius — too risky. Targeted above. */
+
+/* Fix old accent chips that still reference purple */
+.thinking-badge, .running-badge, .mode-badge-top {
+  font-family: var(--ff-ui) !important;
+}
+
+/* ── Scrollbars inside sidebar-scroll and others ───────────────── */
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.memory-body::-webkit-scrollbar-thumb {
+  background: var(--ink-4);
+  border-radius: var(--r-pill);
+}

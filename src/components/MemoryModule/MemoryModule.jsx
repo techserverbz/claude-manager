@@ -192,34 +192,36 @@ export default function MemoryModule({ onClose }) {
               className="memory-brain-select"
               value={activeBrain?.id || ""}
               onChange={e => activateBrain(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: 6, background: "#1e1e2e", color: "#fff", border: "1px solid #333", fontSize: 13 }}
+              aria-label="Active brain"
             >
               {brains.map(b => (
                 <option key={b.id} value={b.id}>
-                  {b.is_builtin ? "\u{1F3E0} " : "\u{1F517} "}{b.name}
+                  {b.is_builtin ? "◉ " : "◈ "}{b.name}
                 </option>
               ))}
             </select>
+            {activeBrain && <span className="op-live" title="Live — reads and writes go here" />}
             <button
-              className="stat"
+              className="stat memory-stat-add"
               onClick={() => setShowAddBrain(true)}
-              style={{ cursor: "pointer", background: "transparent", border: "1px dashed #555", color: "#7c6aef" }}
             >
-              + Add Service Brain
+              + Add service brain
             </button>
             {activeBrain && !activeBrain.is_builtin && (
               <button
-                className="stat"
+                className="stat memory-stat-danger"
                 onClick={() => removeBrain(activeBrain.id)}
-                style={{ cursor: "pointer", background: "transparent", border: "1px solid #ef4444", color: "#ef4444" }}
                 title="Remove this service brain"
               >
                 Remove
               </button>
             )}
-            <span className="stat">{pages.length} pages</span>
-            {syncState && <span className="stat" style={{ color: "#22c55e" }}>{syncState}</span>}
-            <button className="stat" onClick={syncWiki} style={{ cursor: "pointer", background: "transparent", border: "1px solid #333" }}>Sync</button>
+            <span className="stat memory-stat-metric">
+              <span className="op-metric op-metric--acid">{pages.length}</span>
+              &nbsp;pages
+            </span>
+            {syncState && <span className="stat memory-stat-ok">{syncState}</span>}
+            <button className="stat memory-stat-btn" onClick={syncWiki}>Sync</button>
           </div>
         </div>
         <div className="memory-header-right">
@@ -240,8 +242,9 @@ export default function MemoryModule({ onClose }) {
       </div>
 
       {activeBrain && (
-        <div style={{ padding: "6px 16px", borderBottom: "1px solid #22222e", fontSize: 11, color: "#94a3b8", background: "#15151f" }}>
-          {activeBrain.claude_path}
+        <div className="memory-path-strip">
+          <span className="op-label op-label--dim">Path</span>
+          <code>{activeBrain.claude_path}</code>
         </div>
       )}
 
@@ -354,23 +357,21 @@ export default function MemoryModule({ onClose }) {
           ) : view === "planner" ? (
             <div className="memory-detail-content">
               <div className="memory-detail-header">
-                <h3>{plannerFile}</h3>
+                <h3>{plannerFile.replace(/\.md$/, "").replace(/-/g, " ")}</h3>
                 <div className="memory-detail-meta">
                   <span className="memory-detail-path">{activeBrain?.claude_path}/wiki/{plannerFile}</span>
-                  {plannerDirty && <span className="stat" style={{ color: "#eab308" }}>unsaved</span>}
+                  {plannerDirty && <span className="memory-stat-warning">Unsaved</span>}
                   <button
-                    className="stat"
+                    className="memory-planner-save"
                     onClick={savePlanner}
                     disabled={!plannerDirty}
-                    style={{ cursor: plannerDirty ? "pointer" : "default", background: plannerDirty ? "#22c55e" : "#333", color: "#fff", border: 0 }}
                   >Save</button>
                 </div>
               </div>
               <textarea
-                className="memory-content-text"
                 value={plannerContent}
                 onChange={e => { setPlannerContent(e.target.value); setPlannerDirty(true); }}
-                style={{ width: "100%", height: "100%", background: "#0f0f17", color: "#e2e8f0", border: "1px solid #22222e", borderRadius: 6, padding: 12, fontFamily: "Consolas, monospace", fontSize: 13, resize: "none" }}
+                spellCheck={false}
               />
             </div>
           ) : view === "pages" && selectedPage ? (
@@ -378,7 +379,7 @@ export default function MemoryModule({ onClose }) {
               <div className="memory-detail-header">
                 <h3>{selectedPage.name || selectedPage.slug}</h3>
                 <div className="memory-detail-meta">
-                  <span className="memory-detail-type" style={{ color: "#7c6aef", borderColor: "#7c6aef" }}>{selectedPage.category}</span>
+                  <span className="memory-detail-type">{selectedPage.category}</span>
                   <span className="memory-detail-path">wiki/{selectedPage.category}/{selectedPage.slug}.md</span>
                 </div>
               </div>

@@ -1,0 +1,381 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   OPERATOR — Primitives
+   Small reusable building blocks: buttons, chips, rules, live dots, kbd, etc.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Editorial header ─────────────────────────────────────────────── */
+.op-display {
+  font-family: var(--ff-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: var(--track-editorial);
+  color: var(--paper-0);
+  line-height: 1.02;
+  margin: 0;
+}
+.op-display--xl { font-size: var(--t-display-xl); }
+.op-display--l  { font-size: var(--t-display-l);  }
+.op-display--m  { font-size: var(--t-display-m);  }
+.op-display--s  { font-size: var(--t-display-s);  }
+
+/* Rule that animates in from the left */
+.op-rule {
+  display: block;
+  height: 1px;
+  background: var(--rule-1);
+  transform-origin: left center;
+  animation: opRuleGrow var(--dur-grand) var(--ease-editorial) both;
+}
+@keyframes opRuleGrow {
+  from { transform: scaleX(0); opacity: 0.2; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+.op-rule--acid { background: var(--acid); }
+.op-rule--flame { background: var(--flame); }
+
+/* ── Uppercase tracked label (broadsheet "INTERNATIONAL") ─────────── */
+.op-label {
+  font-family: var(--ff-ui);
+  font-size: var(--t-label);
+  font-weight: var(--w-mid);
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
+  color: var(--paper-2);
+  line-height: 1;
+}
+.op-label--dim  { color: var(--paper-3); }
+.op-label--acid { color: var(--acid); }
+.op-label--flame { color: var(--flame); }
+
+/* ── Eyebrow (micro caption before a display) ─────────────────────── */
+.op-eyebrow {
+  font-family: var(--ff-mono);
+  font-size: var(--t-micro);
+  font-weight: var(--w-base);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--paper-3);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.op-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  height: 30px;
+  padding: 0 var(--s-3);
+  font-family: var(--ff-ui);
+  font-size: var(--t-body-s);
+  font-weight: var(--w-mid);
+  letter-spacing: var(--track-normal);
+  color: var(--paper-0);
+  background: var(--ink-2);
+  border: none;
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-inset-hairline);
+  cursor: pointer;
+  transition: background var(--dur-quick) var(--ease-snap),
+              box-shadow var(--dur-quick) var(--ease-snap),
+              color var(--dur-quick) var(--ease-snap);
+}
+.op-btn:hover {
+  background: var(--ink-3);
+  box-shadow: var(--shadow-inset-hairline-strong);
+}
+.op-btn:active {
+  background: var(--ink-4);
+}
+.op-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.op-btn--primary {
+  background: var(--acid);
+  color: #0a0906;
+  box-shadow: var(--glow-acid);
+}
+.op-btn--primary:hover {
+  background: var(--acid);
+  box-shadow: var(--glow-acid), 0 0 32px -4px var(--acid-glow);
+  filter: brightness(1.08);
+}
+.op-btn--primary:active {
+  filter: brightness(0.96);
+}
+
+.op-btn--danger {
+  background: transparent;
+  color: var(--flame);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--flame) 40%, transparent);
+}
+.op-btn--danger:hover {
+  background: color-mix(in srgb, var(--flame) 8%, transparent);
+  box-shadow: var(--glow-flame);
+}
+
+.op-btn--ghost {
+  background: transparent;
+  box-shadow: none;
+  color: var(--paper-1);
+}
+.op-btn--ghost:hover {
+  background: var(--ink-2);
+  box-shadow: var(--shadow-inset-hairline);
+  color: var(--paper-0);
+}
+
+.op-btn--sm { height: 24px; padding: 0 var(--s-2); font-size: var(--t-body-s); }
+.op-btn--lg { height: 38px; padding: 0 var(--s-4); font-size: var(--t-body-l); }
+.op-btn--icon { width: 30px; padding: 0; }
+
+/* ── Chip ─────────────────────────────────────────────────────────── */
+.op-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 22px;
+  padding: 0 10px;
+  font-family: var(--ff-ui);
+  font-size: var(--t-body-s);
+  font-weight: var(--w-mid);
+  letter-spacing: var(--track-normal);
+  color: var(--paper-1);
+  background: var(--ink-2);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-inset-hairline);
+}
+.op-chip--acid {
+  background: color-mix(in srgb, var(--acid) 10%, transparent);
+  color: var(--acid);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--acid) 45%, transparent);
+}
+.op-chip--flame {
+  background: color-mix(in srgb, var(--flame) 10%, transparent);
+  color: var(--flame);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--flame) 45%, transparent);
+}
+.op-chip--ghost {
+  background: transparent;
+  color: var(--paper-2);
+}
+
+/* ── Keyboard chip ────────────────────────────────────────────────── */
+.op-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-family: var(--ff-mono);
+  font-size: 10.5px;
+  font-weight: var(--w-mid);
+  color: var(--paper-2);
+  background: var(--ink-2);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-inset-hairline),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  line-height: 1;
+}
+
+/* ── Live indicator dot (pulses acid green) ───────────────────────── */
+.op-live {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 0 0 var(--acid-glow);
+  animation: opLivePulse 2s var(--ease-editorial) infinite;
+  flex-shrink: 0;
+}
+@keyframes opLivePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--acid-glow); }
+  50%      { box-shadow: 0 0 0 5px transparent; }
+}
+
+.op-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.op-dot--acid  { background: var(--acid); }
+.op-dot--flame { background: var(--flame); }
+.op-dot--amber { background: var(--amber); }
+.op-dot--azure { background: var(--azure); }
+.op-dot--mint  { background: var(--mint); }
+.op-dot--muted { background: var(--paper-3); }
+
+/* ── Card / panel surfaces ─────────────────────────────────────────── */
+.op-panel {
+  position: relative;
+  background: var(--ink-1);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-inset-hairline);
+}
+.op-panel::before {
+  /* baked-in grain */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise);
+  opacity: 0.55;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: overlay;
+}
+
+.op-panel--elevated { background: var(--ink-2); }
+
+/* ── List row ─────────────────────────────────────────────────────── */
+.op-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--rule-0);
+  transition: background var(--dur-instant) var(--ease-snap);
+  cursor: pointer;
+}
+.op-row:hover {
+  background: var(--ink-2);
+  border-bottom-color: var(--rule-1);
+}
+.op-row:last-child {
+  border-bottom: none;
+}
+.op-row[aria-selected="true"],
+.op-row.is-selected {
+  background: var(--ink-3);
+  box-shadow: inset 2px 0 0 var(--acid);
+}
+
+/* ── Input ─────────────────────────────────────────────────────────── */
+.op-input {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  font-family: var(--ff-ui);
+  font-size: var(--t-body);
+  color: var(--paper-0);
+  background: var(--ink-1);
+  border: none;
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-inset-hairline);
+  outline: none;
+  transition: box-shadow var(--dur-quick) var(--ease-snap),
+              background var(--dur-quick) var(--ease-snap);
+}
+.op-input:focus {
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--rule-acid),
+              0 0 0 3px color-mix(in srgb, var(--acid) 14%, transparent);
+}
+.op-input::placeholder { color: var(--paper-3); }
+
+.op-input--mono {
+  font-family: var(--ff-mono);
+  font-size: 12.5px;
+}
+
+.op-textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 12px;
+  font-family: var(--ff-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--paper-0);
+  background: var(--ink-0);
+  border: none;
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-inset-hairline);
+  outline: none;
+  resize: vertical;
+}
+.op-textarea:focus {
+  box-shadow: inset 0 0 0 1px var(--rule-acid);
+}
+
+/* ── Select ────────────────────────────────────────────────────────── */
+.op-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 6px 28px 6px 12px;
+  font-family: var(--ff-ui);
+  font-size: var(--t-body-s);
+  font-weight: var(--w-mid);
+  color: var(--paper-0);
+  background: var(--ink-2);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a294' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  border: none;
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-inset-hairline);
+  cursor: pointer;
+  outline: none;
+  transition: box-shadow var(--dur-quick) var(--ease-snap);
+}
+.op-select:hover { box-shadow: var(--shadow-inset-hairline-strong); }
+.op-select:focus { box-shadow: inset 0 0 0 1px var(--rule-acid); }
+
+/* ── Divider (vertical) ────────────────────────────────────────────── */
+.op-divider-v {
+  width: 1px;
+  height: 18px;
+  background: var(--rule-1);
+  margin: 0 var(--s-2);
+}
+
+/* ── Metric (tabular numerals) ─────────────────────────────────────── */
+.op-metric {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-1);
+  font-size: var(--t-body-s);
+  letter-spacing: 0;
+}
+.op-metric--acid  { color: var(--acid); }
+.op-metric--muted { color: var(--paper-3); }
+
+/* ── Scrollbar (Operator-themed, opt-in via .op-scroll) ───────────── */
+.op-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.op-scroll::-webkit-scrollbar-track { background: transparent; }
+.op-scroll::-webkit-scrollbar-thumb {
+  background: var(--ink-4);
+  border-radius: var(--r-pill);
+}
+.op-scroll::-webkit-scrollbar-thumb:hover { background: var(--ink-5); }
+
+/* ── Focus ring ────────────────────────────────────────────────────── */
+.op-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acid);
+}
+
+/* ── Reveal animations ─────────────────────────────────────────────── */
+.op-reveal {
+  animation: opReveal var(--dur-grand) var(--ease-editorial) both;
+}
+@keyframes opReveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.op-stagger > * {
+  animation: opReveal var(--dur-slow) var(--ease-editorial) both;
+}
+.op-stagger > :nth-child(1) { animation-delay: 0ms; }
+.op-stagger > :nth-child(2) { animation-delay: 40ms; }
+.op-stagger > :nth-child(3) { animation-delay: 80ms; }
+.op-stagger > :nth-child(4) { animation-delay: 120ms; }
+.op-stagger > :nth-child(5) { animation-delay: 160ms; }
+.op-stagger > :nth-child(6) { animation-delay: 200ms; }
+.op-stagger > :nth-child(7) { animation-delay: 240ms; }
+.op-stagger > :nth-child(8) { animation-delay: 280ms; }

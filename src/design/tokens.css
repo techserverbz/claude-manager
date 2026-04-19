@@ -1,0 +1,162 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   OPERATOR — Design Tokens
+   Editorial × Terminal. Warm obsidian, poison-green accent, hairline rules.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surface ────────────────────────────────────────────────────── */
+  --ink-0: #0b0a08;           /* canvas (warm obsidian, not cold blue) */
+  --ink-1: #110f0c;           /* panel */
+  --ink-2: #17140f;           /* elevated panel */
+  --ink-3: #1d1914;           /* hover surface */
+  --ink-4: #251f18;           /* active surface */
+  --ink-5: #2e2720;           /* selected / raised */
+
+  /* ── Type ──────────────────────────────────────────────────────── */
+  --paper-0: #f7f1e4;         /* primary text — warm white */
+  --paper-1: #ded7c6;         /* secondary */
+  --paper-2: #a8a294;         /* muted */
+  --paper-3: #6e6a5e;         /* ghost */
+  --paper-4: #3f3c37;         /* whisper */
+
+  /* ── Accent ────────────────────────────────────────────────────── */
+  --acid:     #b7f500;        /* signature — poison green */
+  --acid-dim: #8fc400;
+  --acid-glow: color-mix(in srgb, var(--acid) 20%, transparent);
+
+  --flame:    #ff5e3a;        /* danger / alert — tangerine */
+  --flame-glow: color-mix(in srgb, var(--flame) 20%, transparent);
+
+  --amber:    #f5c451;        /* warning */
+  --azure:    #5eb3ff;        /* info */
+  --mint:     #6fe3b5;        /* success (softer than acid — acid is reserved for active/live) */
+
+  /* ── Borders ─────────────────────────────────────────────────────
+     Hairlines via box-shadow trick (inset 0 0 0 0.5px) where possible.
+     These color tokens are for regular borders. */
+  --rule-0: rgba(247, 241, 228, 0.06);   /* whisper hairline */
+  --rule-1: rgba(247, 241, 228, 0.10);   /* standard hairline */
+  --rule-2: rgba(247, 241, 228, 0.16);   /* hover hairline */
+  --rule-3: rgba(247, 241, 228, 0.24);   /* focused / selected */
+  --rule-acid: color-mix(in srgb, var(--acid) 35%, transparent);
+
+  /* ── Shadows ─────────────────────────────────────────────────────
+     Editorial — very subtle, mostly ambient. No drop shadows larger than 24px. */
+  --shadow-inset-hairline: inset 0 0 0 0.5px var(--rule-1);
+  --shadow-inset-hairline-strong: inset 0 0 0 0.5px var(--rule-2);
+  --shadow-lift: 0 1px 0 rgba(0, 0, 0, 0.5), 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 0 0 1px var(--rule-2), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --glow-acid: 0 0 0 1px var(--rule-acid), 0 0 24px -4px var(--acid-glow);
+  --glow-flame: 0 0 0 1px color-mix(in srgb, var(--flame) 40%, transparent),
+                0 0 24px -4px var(--flame-glow);
+
+  /* ── Radius ──────────────────────────────────────────────────────
+     Editorial — mostly sharp. Chips get full-round for contrast. */
+  --r-0: 0px;        /* sharp */
+  --r-1: 2px;        /* whisper */
+  --r-2: 4px;        /* panels */
+  --r-3: 8px;        /* cards */
+  --r-pill: 999px;   /* chips */
+
+  /* ── Spacing (4pt grid) ─────────────────────────────────────────── */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* ── Type ranks ──────────────────────────────────────────────────
+     Display sizes use Instrument Serif italic.
+     Body sizes use Geist. Mono uses JetBrains Mono. */
+  --t-display-xl: 48px;
+  --t-display-l:  36px;
+  --t-display-m:  28px;
+  --t-display-s:  22px;
+  --t-title:      17px;
+  --t-body-l:     14px;
+  --t-body:       13px;
+  --t-body-s:     12px;
+  --t-label:      10.5px;     /* uppercase tracked labels */
+  --t-micro:      9.5px;
+
+  /* ── Families ──────────────────────────────────────────────────── */
+  --ff-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --ff-ui:    "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  --ff-mono:  "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+
+  /* ── Weights ─────────────────────────────────────────────────────
+     Geist: 300 for whisper, 400 default, 500 emphasis, 600 strong. */
+  --w-whisper: 300;
+  --w-base:    400;
+  --w-mid:     500;
+  --w-strong:  600;
+
+  /* ── Tracking (letter-spacing) ─────────────────────────────────── */
+  --track-tight:  -0.01em;
+  --track-normal:  0em;
+  --track-wide:    0.04em;
+  --track-wider:   0.12em;     /* uppercase labels */
+  --track-editorial: -0.015em; /* display serif */
+
+  /* ── Motion ─────────────────────────────────────────────────────── */
+  --ease-editorial: cubic-bezier(0.2, 0.8, 0.2, 1);    /* elegant */
+  --ease-snap:      cubic-bezier(0.3, 0, 0, 1);        /* quick */
+  --ease-bounce:    cubic-bezier(0.2, 1.4, 0.4, 1);    /* soft overshoot */
+
+  --dur-instant: 80ms;
+  --dur-quick:   160ms;
+  --dur-base:    240ms;
+  --dur-slow:    420ms;
+  --dur-grand:   680ms;        /* reveal animations */
+
+  /* ── Legacy aliases (for existing components that we haven't reskinned yet)
+         Keep these so the old CSS still works during rollout. ─────── */
+  --bg-primary: var(--ink-0);
+  --bg-secondary: var(--ink-1);
+  --bg-tertiary: var(--ink-2);
+  --bg-elevated: var(--ink-3);
+  --bg-hover: var(--ink-3);
+  --bg-active: var(--ink-4);
+
+  --text-primary: var(--paper-0);
+  --text-secondary: var(--paper-1);
+  --text-muted: var(--paper-2);
+  --text-ghost: var(--paper-3);
+
+  --accent: var(--acid);
+  --accent-hover: var(--acid-dim);
+  --accent-muted: color-mix(in srgb, var(--acid) 12%, transparent);
+  --accent-glow: var(--acid-glow);
+  --accent-light: var(--acid);
+
+  --success: var(--mint);
+  --success-bg: color-mix(in srgb, var(--mint) 12%, transparent);
+  --danger: var(--flame);
+  --danger-bg: color-mix(in srgb, var(--flame) 12%, transparent);
+  --warning: var(--amber);
+  --warning-bg: color-mix(in srgb, var(--amber) 12%, transparent);
+  --info: var(--azure);
+  --info-bg: color-mix(in srgb, var(--azure) 12%, transparent);
+
+  --border: var(--rule-1);
+  --border-secondary: var(--rule-2);
+  --border-focus: var(--rule-acid);
+  --shadow: rgba(0, 0, 0, 0.6);
+
+  --radius-sm: var(--r-1);
+  --radius-md: var(--r-2);
+  --radius-lg: var(--r-3);
+
+  --font-sans: var(--ff-ui);
+  --font-mono: var(--ff-mono);
+}
+
+/* ── Noise texture (procedural, baked via data URI) ────────────────── */
+:root {
+  --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.96  0 0 0 0 0.94  0 0 0 0 0.89  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}

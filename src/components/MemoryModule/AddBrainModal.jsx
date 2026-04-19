@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import "./AddBrainModal.css";
 
 export default function AddBrainModal({ onClose, onAdded }) {
   const [name, setName] = useState("");
@@ -39,78 +40,63 @@ export default function AddBrainModal({ onClose, onAdded }) {
   };
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
-        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#1e1e2e", color: "#e2e8f0", borderRadius: 10,
-          padding: 24, width: 520, maxWidth: "90vw", border: "1px solid #333"
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>Add Service Brain</h3>
-          <button onClick={onClose} style={{ background: "transparent", color: "#94a3b8", border: "none", fontSize: 20, cursor: "pointer" }}>&times;</button>
+    <div className="ab-overlay" onClick={onClose}>
+      <div className="ab-modal" onClick={e => e.stopPropagation()}>
+        <div className="ab-head">
+          <div>
+            <div className="ab-eyebrow">Register</div>
+            <h3 className="ab-title">Service Brain</h3>
+          </div>
+          <button className="ab-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>Name</label>
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Real Estate"
-            style={{ width: "100%", padding: "8px 10px", borderRadius: 6, background: "#0f0f17", color: "#e2e8f0", border: "1px solid #333" }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
-            Path to .claude folder
+        <div className="ab-body">
+          <label className="ab-field">
+            <span className="ab-label">Name</span>
+            <input
+              className="ab-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Real Estate"
+              autoFocus
+            />
           </label>
-          <input
-            value={claudePath}
-            onChange={e => { setClaudePath(e.target.value); setNeedsInit(false); }}
-            placeholder="G:/My Drive/Services/Real Estate/.claude"
-            style={{ width: "100%", padding: "8px 10px", borderRadius: 6, background: "#0f0f17", color: "#e2e8f0", border: "1px solid #333", fontFamily: "Consolas, monospace", fontSize: 13 }}
-          />
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
-            The wiki lives at <code>{claudePath || "{path}"}/wiki/</code>; skills at <code>{claudePath || "{path}"}/skills/</code>.
-          </div>
+
+          <label className="ab-field">
+            <span className="ab-label">Path to .claude folder</span>
+            <input
+              className="ab-input ab-input--mono"
+              value={claudePath}
+              onChange={e => { setClaudePath(e.target.value); setNeedsInit(false); }}
+              placeholder="G:/My Drive/Services/Real Estate/.claude"
+            />
+            <span className="ab-hint">
+              Wiki at <code>{claudePath || "{path}"}/wiki/</code> · Skills at <code>{claudePath || "{path}"}/skills/</code>
+            </span>
+          </label>
+
+          {err && (
+            <div className={`ab-alert ${needsInit ? "is-warning" : "is-error"}`}>
+              <div className="ab-alert-msg">{err}</div>
+              {needsInit && <div className="ab-alert-prompt">Initialize a Karpathy Brain wiki structure at this path?</div>}
+            </div>
+          )}
         </div>
 
-        {err && (
-          <div style={{ padding: "8px 12px", background: needsInit ? "#3f2a15" : "#3b1d1d", border: "1px solid " + (needsInit ? "#eab308" : "#ef4444"), borderRadius: 6, marginBottom: 14, fontSize: 13 }}>
-            {err}
-            {needsInit && (
-              <div style={{ marginTop: 8 }}>
-                Initialize a Karpathy Brain wiki structure at this path?
-              </div>
-            )}
-          </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button
-            onClick={onClose}
-            style={{ padding: "8px 14px", background: "transparent", color: "#94a3b8", border: "1px solid #333", borderRadius: 6, cursor: "pointer" }}
-          >Cancel</button>
+        <div className="ab-foot">
+          <button className="ab-btn ab-btn--ghost" onClick={onClose}>Cancel</button>
           {needsInit ? (
             <button
+              className="ab-btn ab-btn--warning"
               onClick={() => submit(true)}
               disabled={submitting}
-              style={{ padding: "8px 14px", background: "#eab308", color: "#000", border: 0, borderRadius: 6, cursor: submitting ? "default" : "pointer", fontWeight: 600 }}
             >{submitting ? "Initializing..." : "Initialize & Add"}</button>
           ) : (
             <button
+              className="ab-btn ab-btn--primary"
               onClick={() => submit(false)}
               disabled={submitting}
-              style={{ padding: "8px 14px", background: "#7c6aef", color: "#fff", border: 0, borderRadius: 6, cursor: submitting ? "default" : "pointer", fontWeight: 600 }}
-            >{submitting ? "Adding..." : "Add Brain"}</button>
+            >{submitting ? "Adding..." : "Add brain"}</button>
           )}
         </div>
       </div>

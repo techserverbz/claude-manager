@@ -1,7 +1,12 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   OPERATOR — Shell (app layout + top bar)
+   ══════════════════════════════════════════════════════════════════════════ */
+
 .app {
   display: flex;
   height: 100vh;
   overflow: hidden;
+  background: var(--ink-0);
 }
 
 .main-content {
@@ -10,68 +15,97 @@
   flex-direction: column;
   position: relative;
   min-width: 0;
+  background: var(--ink-0);
 }
 
-/* Top Bar */
+/* ── Top Bar ─────────────────────────────────────────────────────── */
 .top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  height: 56px;
-  gap: 12px;
+  height: 52px;
+  padding: 0 20px;
+  background: var(--ink-0);
+  box-shadow: inset 0 -1px 0 var(--rule-1);
+  gap: 16px;
+  position: relative;
+  z-index: 5;
 }
 
 .agent-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex: 1;
+  min-width: 0;
 }
 
+/* Acid live dot when online, flame when offline */
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-
 .status-dot.online {
-  background: var(--success);
-  box-shadow: 0 0 8px rgba(0, 184, 148, 0.5);
+  background: var(--acid);
+  box-shadow: 0 0 0 0 var(--acid-glow);
+  animation: opLivePulse 2s var(--ease-editorial) infinite;
 }
-
 .status-dot.offline {
-  background: var(--danger);
+  background: var(--flame);
 }
 
+/* Wordmark — Instrument Serif italic. This is the editorial signature. */
 .agent-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--ff-serif);
+  font-style: italic;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: var(--track-editorial);
+  color: var(--paper-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
 }
 
 .thinking-badge,
 .running-badge {
-  font-size: 12px;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  font-family: var(--ff-ui);
+  font-size: 11px;
+  font-weight: var(--w-mid);
+  letter-spacing: var(--track-wide);
+  border-radius: var(--r-pill);
+  line-height: 1;
 }
 
 .thinking-badge {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--accent-light);
-  animation: typing 1.5s infinite;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--amber) 40%, transparent);
+}
+.thinking-badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: opLivePulse 1s var(--ease-editorial) infinite;
 }
 
-
 .running-badge {
-  background: rgba(0, 184, 148, 0.15);
-  color: var(--success);
-  font-size: 11px;
+  color: var(--acid);
+  background: color-mix(in srgb, var(--acid) 10%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--acid) 40%, transparent);
+  font-size: 10px;
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
 }
 
 .top-actions {
@@ -80,53 +114,57 @@
   align-items: center;
 }
 
+/* ── Queue indicator ─────────────────────────────────────────────── */
 .queue-indicator {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: rgba(254, 202, 87, 0.1);
-  border: 1px solid rgba(254, 202, 87, 0.3);
-  border-radius: 8px;
+  gap: 8px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--amber) 40%, transparent);
   cursor: default;
 }
-
 .queue-badge-top {
-  background: var(--warning);
-  color: #000;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 0px 5px;
-  border-radius: 8px;
-  min-width: 16px;
-  text-align: center;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amber);
+  color: #0b0a08;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: var(--w-strong);
+  padding: 0 4px;
+  border-radius: var(--r-pill);
 }
-
 .queue-label {
-  font-size: 11px;
-  color: var(--warning);
-  font-weight: 500;
+  font-family: var(--ff-ui);
+  font-size: 10.5px;
+  font-weight: var(--w-mid);
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
+  color: var(--amber);
 }
 
-.volume-control {
-  position: relative;
-}
+/* ── Volume control ─────────────────────────────────────────────── */
+.volume-control { position: relative; }
 
 .volume-slider-popup {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   right: 0;
-  margin-top: 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 10px;
+  background: var(--ink-1);
+  border-radius: var(--r-2);
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   z-index: 100;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-pop);
 }
 
 .volume-slider {
@@ -139,132 +177,152 @@
   background: transparent;
   cursor: pointer;
 }
-
 .volume-slider::-webkit-slider-runnable-track {
-  width: 6px;
+  width: 4px;
   height: 100px;
-  background: var(--bg-hover);
-  border-radius: 3px;
+  background: var(--ink-3);
+  border-radius: var(--r-pill);
 }
-
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--acid);
   margin-left: -4px;
   cursor: pointer;
+  box-shadow: 0 0 10px var(--acid-glow);
 }
-
 .volume-slider::-moz-range-track {
-  width: 6px;
+  width: 4px;
   height: 100px;
-  background: var(--bg-hover);
-  border-radius: 3px;
+  background: var(--ink-3);
+  border-radius: var(--r-pill);
 }
-
 .volume-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--acid);
   border: none;
   cursor: pointer;
 }
 
 .volume-label {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-weight: 500;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--paper-2);
+  font-weight: var(--w-mid);
 }
 
-/* Buttons */
+/* ── Buttons ─────────────────────────────────────────────────────── */
 .btn-icon {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--paper-2);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-1);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: color 0.15s ease-out, background 0.15s ease-out, border-color 0.15s ease-out;
+  box-shadow: var(--shadow-inset-hairline);
+  transition: color var(--dur-quick) var(--ease-snap),
+              background var(--dur-quick) var(--ease-snap),
+              box-shadow var(--dur-quick) var(--ease-snap);
 }
-
 .btn-icon:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-secondary);
+  background: var(--ink-2);
+  color: var(--paper-0);
+  box-shadow: var(--shadow-inset-hairline-strong);
 }
-
 .btn-icon.active {
-  color: var(--accent-light);
-  border-color: var(--accent);
-  background: var(--accent-muted);
+  color: var(--acid);
+  background: color-mix(in srgb, var(--acid) 8%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--acid) 45%, transparent);
 }
 
 .btn-primary {
-  background: var(--accent);
-  color: #ffffff;
+  background: var(--acid);
+  color: #0b0a08;
   border: none;
   padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  font-family: var(--ff-ui);
+  font-size: var(--t-body);
+  font-weight: var(--w-mid);
+  border-radius: var(--r-1);
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: var(--glow-acid);
+  transition: filter var(--dur-quick) var(--ease-snap);
 }
-
-.btn-primary:hover {
-  background: var(--accent-light);
-}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { filter: brightness(0.94); }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
+  background: var(--ink-2);
+  color: var(--paper-0);
+  border: none;
   padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
+  font-family: var(--ff-ui);
+  font-size: var(--t-body);
+  font-weight: var(--w-mid);
+  border-radius: var(--r-1);
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: var(--shadow-inset-hairline);
+  transition: background var(--dur-quick) var(--ease-snap),
+              box-shadow var(--dur-quick) var(--ease-snap);
 }
-
 .btn-secondary:hover {
-  background: var(--bg-hover);
+  background: var(--ink-3);
+  box-shadow: var(--shadow-inset-hairline-strong);
 }
 
-/* Agent mode badge in top bar */
+/* ── Agent mode pill in top bar ───────────────────────────────── */
 .mode-badge-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--ff-ui);
   font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 10px;
-  letter-spacing: 0.4px;
-  font-family: var(--font-mono);
+  font-weight: var(--w-mid);
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
+  line-height: 1;
+}
+.mode-badge-top::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 .mode-badge-top.coding {
-  background: var(--info-bg);
-  color: var(--info);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: color-mix(in srgb, var(--azure) 10%, transparent);
+  color: var(--azure);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--azure) 35%, transparent);
 }
+.mode-badge-top.coding::before { background: var(--azure); }
 .mode-badge-top.personal {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: color-mix(in srgb, var(--mint) 10%, transparent);
+  color: var(--mint);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--mint) 35%, transparent);
 }
+.mode-badge-top.personal::before { background: var(--mint); }
 
-/* Modal overlay (generic) */
+/* ── Modal overlay ────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(11, 10, 8, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px) saturate(130%);
+  -webkit-backdrop-filter: blur(8px) saturate(130%);
+  animation: opReveal var(--dur-base) var(--ease-editorial) both;
 }
