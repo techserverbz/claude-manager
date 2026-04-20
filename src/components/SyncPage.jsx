@@ -155,36 +155,16 @@ export default function SyncPage({ onClose }) {
           <div className="sync-services">
             <div className="sync-services-head">Registered Services</div>
             {s.services.map((svc, i) => {
-              const svcLoading = actionLoading === `svc-${svc.name}`;
-              const svcResult = actionResult?.target === `svc-${svc.name}` ? actionResult : null;
+              const svcCheckLoading = actionLoading === `svc-check-${svc.name}`;
+              const svcSyncLoading = actionLoading === `svc-sync-${svc.name}`;
+              const svcCheck = checks[`svc-${svc.name}`];
+              const svcResult = actionResult?.target === `svc-sync-${svc.name}` ? actionResult : null;
               return (
                 <div key={i} className="sync-service-item">
                   <div className="sync-service-row">
                     <span className="sync-service-name">{svc.name}</span>
                     <span className="sync-mono">{svc.commit || "no sync"}</span>
                     {svc.wikiActive && <span className="sync-chip sync-chip--ok" style={{fontSize:9,height:16,padding:"0 6px"}}>Wiki Active</span>}
-                    <button
-                      className="sync-btn sync-btn--sm"
-                      disabled={!!actionLoading}
-                      onClick={async () => {
-                        setActionLoading(`svc-${svc.name}`);
-                        setActionResult(null);
-                        try {
-                          const res = await fetch(`/api/sync/karpathy-services/install`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ servicePath: svc.claudePath }),
-                          });
-                          const data = await res.json();
-                          setActionResult({ target: `svc-${svc.name}`, ...data });
-                          await fetchStatus();
-                        } catch (err) {
-                          setActionResult({ target: `svc-${svc.name}`, success: false, error: err.message });
-                        } finally { setActionLoading(null); }
-                      }}
-                    >
-                      {svcLoading ? "Updating..." : "Sync"}
-                    </button>
                   </div>
                   <div className="sync-service-details">
                     {svc.wikiPath && <span className="sync-mono sync-path" title={svc.wikiPath}>Wiki: {svc.wikiPath}</span>}
@@ -193,11 +173,65 @@ export default function SyncPage({ onClose }) {
                     {svc.pageCategories !== undefined && <span className="sync-mono">{svc.pageCategories} categories</span>}
                     {svc.note && <span className="sync-mono" style={{color:"var(--amber)"}}>{svc.note}</span>}
                   </div>
+                  {svcCheck && !svcCheck.error && (
+                    <div className={`sync-check-result ${svcCheck.upToDate ? "is-ok" : "is-behind"}`} style={{margin:"6px 0 0",padding:"6px 12px",fontSize:11}}>
+                      {svcCheck.upToDate
+                        ? <span>Up to date on <b>{svcCheck.local?.commit}</b></span>
+                        : <span>Behind: local <b>{svcCheck.local?.commit || "none"}</b> vs remote <b>{svcCheck.remote?.commit}</b>{svcCheck.remote?.commitMessage && <span className="sync-check-msg"> — {svcCheck.remote.commitMessage.slice(0, 60)}</span>}</span>
+                      }
+                    </div>
+                  )}
                   {svcResult && (
                     <div className={`sync-action-result ${svcResult.success ? "is-ok" : "is-error"}`} style={{margin:"6px 0 0",padding:"6px 12px",fontSize:11}}>
                       {svcResult.success ? <span>Updated to <b>{svcResult.commit}</b></span> : <span>{svcResult.error}</span>}
                     </div>
                   )}
+                  <div className="sync-card-actions" style={{padding:"10px 0 4px"}}>
+                    <button
+                      className="sync-btn"
+                      disabled={!!actionLoading}
+                      onClick={async () => {
+                        setActionLoading(`svc-check-${svc.name}`);
+                        try {
+                          const res = await fetch(`/api/sync/karpathy-services/check`, { method: "POST" });
+                          const data = await res.json();
+                          setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: { ...data, local: { ...data.local, commit: svc.commit } } }));
+                        } catch (err) {
+                          setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: { error: err.message } }));
+                        } finally { setActionLoading(null); }
+                      }}
+                    >
+                      {svcCheckLoading ? "Checking..." : "Check for updates"}
+                    </button>
+                    <button
+                      className="sync-btn sync-btn--primary"
+                      disabled={!!actionLoading}
+                      onClick={async () => {
+                        setActionLoading(`svc-sync-${svc.name}`);
+                        setActionResult(null);
+                        try {
+                          const res = await fetch(`/api/sync/karpathy-services/install`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ servicePath: svc.claudePath }),
+                          });
+                          const data = await res.json();
+                          setActionResult({ target: `svc-sync-${svc.name}`, ...data });
+                          await fetchStatus();
+                          // Re-check after sync
+                          try {
+                            const cr = await fetch(`/api/sync/karpathy-services/check`, { method: "POST" });
+                            const cd = await cr.json();
+                            setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: { ...cd, local: { ...cd.local, commit: data.commit } } }));
+                          } catch {}
+                        } catch (err) {
+                          setActionResult({ target: `svc-sync-${svc.name}`, success: false, error: err.message });
+                        } finally { setActionLoading(null); }
+                      }}
+                    >
+                      {svcSyncLoading ? "Updating..." : "Sync / Update"}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -248,26 +282,38 @@ export default function SyncPage({ onClose }) {
         )}
 
         <div className="sync-card-actions">
-          <button
-            className="sync-btn"
-            onClick={() => checkForUpdates(target.key)}
-            disabled={!!actionLoading}
-          >
-            {isCheckLoading ? "Checking..." : "Check for updates"}
-          </button>
-          <button
-            className="sync-btn sync-btn--primary"
-            onClick={() => {
-              const opts = {};
-              if (target.key === "karpathy-services" && serviceInstallPath) {
-                opts.servicePath = serviceInstallPath;
-              }
-              installOrUpdate(target.key, opts);
-            }}
-            disabled={!!actionLoading}
-          >
-            {isInstallLoading ? "Working..." : s.installed ? "Sync / Update" : "Install"}
-          </button>
+          {/* For services: hide global check/sync buttons — per-service buttons handle it.
+              Only show "Install" when adding a NEW service via the path input. */}
+          {target.key !== "karpathy-services" && (
+            <>
+              <button
+                className="sync-btn"
+                onClick={() => checkForUpdates(target.key)}
+                disabled={!!actionLoading}
+              >
+                {isCheckLoading ? "Checking..." : "Check for updates"}
+              </button>
+              <button
+                className="sync-btn sync-btn--primary"
+                onClick={() => installOrUpdate(target.key)}
+                disabled={!!actionLoading}
+              >
+                {isInstallLoading ? "Working..." : s.installed ? "Sync / Update" : "Install"}
+              </button>
+            </>
+          )}
+          {target.key === "karpathy-services" && (
+            <button
+              className="sync-btn sync-btn--primary"
+              onClick={() => {
+                if (!serviceInstallPath.trim()) return;
+                installOrUpdate(target.key, { servicePath: serviceInstallPath.trim() });
+              }}
+              disabled={!!actionLoading || !serviceInstallPath.trim()}
+            >
+              {isInstallLoading ? "Installing..." : "Install New Service"}
+            </button>
+          )}
         </div>
       </div>
     );
