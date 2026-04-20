@@ -181,7 +181,7 @@ export default function SyncPage({ onClose }) {
               className="sync-input"
               value={serviceInstallPath}
               onChange={e => setServiceInstallPath(e.target.value)}
-              placeholder="G:/My Drive/Services/Real Estate/.claude"
+              placeholder="I:/My Drive/Real Estate/.claude"
             />
           </div>
         )}

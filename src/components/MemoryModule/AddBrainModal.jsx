@@ -68,7 +68,7 @@ export default function AddBrainModal({ onClose, onAdded }) {
               className="ab-input ab-input--mono"
               value={claudePath}
               onChange={e => { setClaudePath(e.target.value); setNeedsInit(false); }}
-              placeholder="G:/My Drive/Services/Real Estate/.claude"
+              placeholder="I:/My Drive/Real Estate/.claude"
             />
             <span className="ab-hint">
               Wiki at <code>{claudePath || "{path}"}/wiki/</code> · Skills at <code>{claudePath || "{path}"}/skills/</code>
