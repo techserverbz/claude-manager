@@ -231,6 +231,23 @@ export default function SyncPage({ onClose }) {
                     >
                       {svcSyncLoading ? "Updating..." : "Sync / Update"}
                     </button>
+                    <button
+                      className="sync-btn sync-btn--danger"
+                      disabled={!!actionLoading}
+                      onClick={async () => {
+                        if (!confirm(`Remove "${svc.name}" service brain? (Wiki files on disk stay untouched.)`)) return;
+                        try {
+                          const brains = await (await fetch("/api/brains")).json();
+                          const brain = brains.find(b => b.name === svc.name);
+                          if (brain) {
+                            await fetch(`/api/brains/${brain.id}`, { method: "DELETE" });
+                            await fetchStatus();
+                          }
+                        } catch {}
+                      }}
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
               );
@@ -585,6 +602,16 @@ export default function SyncPage({ onClose }) {
           padding:4px 12px; font-size:10px; height:24px;
           letter-spacing:var(--track-wider); text-transform:uppercase;
           margin-left:auto; flex-shrink:0;
+        }
+
+        .sync-btn--danger {
+          background:transparent;
+          color:var(--flame);
+          box-shadow:inset 0 0 0 0.5px color-mix(in srgb, var(--flame) 40%, transparent);
+        }
+        .sync-btn--danger:hover:not(:disabled) {
+          background:color-mix(in srgb, var(--flame) 8%, transparent);
+          box-shadow:inset 0 0 0 0.5px color-mix(in srgb, var(--flame) 60%, transparent);
         }
 
         .sync-btn--primary {
