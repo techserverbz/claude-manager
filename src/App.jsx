@@ -919,7 +919,6 @@ export default function App() {
           <div className="agent-indicator">
             <span className={`status-dot ${connected ? "online" : "offline"}`} />
             <span className="agent-name">{appName}</span>
-            <span className={`mode-badge-top ${agentMode}`}>{agentMode}</span>
             {isThinking && <span className="thinking-badge">thinking...</span>}
             {runningCount > 0 && !isThinking && (
               <span className="running-badge">{runningCount} running</span>
