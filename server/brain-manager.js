@@ -71,7 +71,14 @@ export class BrainManager {
     if (!name || !claude_path) throw new Error("name and claude_path are required");
 
     // Expand ~/ and normalize
-    const normalized = this._normalizePath(claude_path);
+    let normalized = this._normalizePath(claude_path);
+
+    // Handle both formats: user may paste project root OR .claude path
+    // If path doesn't end in .claude but {path}/.claude exists, use that
+    if (!normalized.endsWith(".claude") && fs.existsSync(path.join(normalized, ".claude"))) {
+      normalized = path.join(normalized, ".claude");
+    }
+    // If path ends in .claude, keep it as-is (it IS the .claude folder)
 
     // Folder must exist
     if (!fs.existsSync(normalized)) {
