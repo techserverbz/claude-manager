@@ -539,6 +539,38 @@
   border: none !important;
 }
 
+/* Session browser — tabs + buttons */
+.session-filter-pill:hover {
+  border-color: color-mix(in srgb, var(--acid) 40%, transparent) !important;
+}
+.session-filter-pill.active {
+  background: color-mix(in srgb, var(--acid) 10%, transparent) !important;
+  border-color: var(--acid) !important;
+  color: var(--acid) !important;
+}
+.session-filter-pill.active .filter-count {
+  background: color-mix(in srgb, var(--acid) 20%, transparent) !important;
+  color: var(--acid) !important;
+}
+.session-resume-btn {
+  background: var(--acid) !important;
+  color: #0b0a08 !important;
+  border: none !important;
+  box-shadow: var(--glow-acid) !important;
+  border-radius: var(--r-1) !important;
+  font-family: var(--ff-ui) !important;
+  font-weight: var(--w-mid) !important;
+}
+.session-resume-btn:hover:not(:disabled) { filter: brightness(1.1) !important; }
+.session-refresh-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline) !important;
+  color: var(--paper-3) !important;
+  border-radius: var(--r-1) !important;
+}
+.session-refresh-btn:hover { color: var(--paper-0) !important; background: var(--ink-2) !important; }
+
 /* Cron Jobs inline page — also gets the treatment */
 .cron-jobs-page h2,
 div[style*="Cron Jobs"] h2 {
