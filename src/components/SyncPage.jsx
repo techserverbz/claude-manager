@@ -117,10 +117,28 @@ export default function SyncPage({ onClose }) {
                 <span className="sync-mono sync-path">{s.path}</span>
               </div>
             )}
+            {s.wikiPath && (
+              <div className="sync-row">
+                <span className="sync-label">Wiki</span>
+                <span className="sync-mono sync-path">{s.wikiPath}</span>
+              </div>
+            )}
             {s.clonePath && (
               <div className="sync-row">
                 <span className="sync-label">Clone</span>
-                <span className="sync-mono sync-path">{s.clonePath}</span>
+                <span className="sync-mono sync-path">{s.clonePath}{s.hasClone === false ? " (not cloned)" : ""}</span>
+              </div>
+            )}
+            {s.rawLogs !== undefined && (
+              <div className="sync-row">
+                <span className="sync-label">Raw logs</span>
+                <span className="sync-mono">{s.rawLogs} pending</span>
+              </div>
+            )}
+            {s.pageCategories !== undefined && (
+              <div className="sync-row">
+                <span className="sync-label">Categories</span>
+                <span className="sync-mono">{s.pageCategories}</span>
               </div>
             )}
           </div>
