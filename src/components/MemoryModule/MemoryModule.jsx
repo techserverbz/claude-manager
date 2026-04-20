@@ -220,8 +220,6 @@ export default function MemoryModule({ onClose }) {
               <span className="op-metric op-metric--acid">{pages.length}</span>
               &nbsp;pages
             </span>
-            {syncState && <span className="stat memory-stat-ok">{syncState}</span>}
-            <button className="stat memory-stat-btn" onClick={syncWiki}>Sync</button>
           </div>
         </div>
         <div className="memory-header-right">

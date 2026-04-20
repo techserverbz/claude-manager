@@ -16,7 +16,6 @@ export class HealthChecker {
     results.push(await this._checkRawLogCapture("personal"));
     results.push(await this._checkSessionIdInjection("personal"));
     results.push(await this._checkJsonlExtraction("personal"));
-    results.push(await this._checkWikiSync("personal"));
 
     // Service brains
     const brains = await this.brainManager.listBrains();
@@ -29,7 +28,6 @@ export class HealthChecker {
       }
     }
 
-    results.push(await this._checkMemoryEntities());
     results.push(await this._checkBrainsTable());
 
     const passed = results.filter(r => r.status === "pass").length;
