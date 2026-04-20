@@ -16,7 +16,10 @@ const CLAUDE_NESTING_VARS = [
 const MAX_CONCURRENT = 5;
 const CLAUDE_PROJECTS_DIR = path.join(process.env.USERPROFILE || process.env.HOME, ".claude", "projects");
 
-// Find the original working directory of a session by reading the cwd field from the session file
+// Find the original working directory of a session by reading the cwd field from the session file.
+// DOES NOT check fs.existsSync on the cwd — Drive paths may not be materialized yet but Claude
+// still needs the correct hash. If the path truly doesn't exist, let Claude produce the error
+// instead of silently falling back to the wrong directory (which causes "session not found" forever).
 function findSessionCwd(sessionId) {
   if (!sessionId || !fs.existsSync(CLAUDE_PROJECTS_DIR)) return null;
   try {
@@ -26,7 +29,6 @@ function findSessionCwd(sessionId) {
     for (const dir of dirs) {
       const jsonlPath = path.join(CLAUDE_PROJECTS_DIR, dir, `${sessionId}.jsonl`);
       if (fs.existsSync(jsonlPath)) {
-        // Read first few lines to find the cwd field
         const fd = fs.openSync(jsonlPath, "r");
         const buf = Buffer.alloc(4096);
         fs.readSync(fd, buf, 0, 4096, 0);
@@ -36,7 +38,7 @@ function findSessionCwd(sessionId) {
         for (const line of lines) {
           try {
             const evt = JSON.parse(line);
-            if (evt.cwd && fs.existsSync(evt.cwd)) return evt.cwd;
+            if (evt.cwd) return evt.cwd; // trust the stored cwd — no existence check
           } catch {}
         }
         return null;

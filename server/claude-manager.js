@@ -122,7 +122,7 @@ export class ClaudeManager {
           for (const line of lines) {
             try {
               const evt = JSON.parse(line);
-              if (evt.cwd && fs.existsSync(evt.cwd)) return evt.cwd;
+              if (evt.cwd) return evt.cwd; // trust the stored cwd — no existence check
             } catch {}
           }
           return null;
