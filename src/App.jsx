@@ -512,7 +512,10 @@ export default function App() {
               }));
               setHasMoreByConvo((prev) => ({ ...prev, [convoId]: false }));
               setTotalMsgsByConvo((prev) => ({ ...prev, [convoId]: cliEvents.length }));
-              if (cwd) setCwdByConvo((prev) => ({ ...prev, [convoId]: cwd }));
+              // Prefer conversation metadata cwd over JSONL cwd (metadata may have been updated)
+              const metaCwd = meta.cwd || meta.workingDirectory;
+              const displayCwd = metaCwd || cwd;
+              if (displayCwd) setCwdByConvo((prev) => ({ ...prev, [convoId]: displayCwd }));
               return; // loaded from session file — skip flat message loading
             }
           } catch {} // try next or fall through
