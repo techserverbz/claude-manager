@@ -120,6 +120,27 @@ export class SyncManager {
       } catch {}
     }
 
+    // No clone and no sync log — but check if the wiki structure itself exists
+    // (user may have set it up manually via hooks, not via install.sh)
+    const wikiPagesDir = path.join(CLAUDE_HOME, "wiki", "wiki");
+    if (fs.existsSync(wikiPagesDir)) {
+      try {
+        const pageCount = fs.readdirSync(wikiPagesDir).filter(d => {
+          try { return fs.statSync(path.join(wikiPagesDir, d)).isDirectory(); } catch { return false; }
+        }).length;
+        return {
+          ...info,
+          installed: true,
+          commit: null,
+          clonePath,
+          hasClone: false,
+          wikiActive: true,
+          pageCategories: pageCount,
+          note: "Wiki is active (set up manually). Click Install to connect to GitHub for sync tracking + updates.",
+        };
+      } catch {}
+    }
+
     return { ...info, installed: false, clonePath };
   }
 
