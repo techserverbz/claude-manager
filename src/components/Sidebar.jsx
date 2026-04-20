@@ -383,7 +383,7 @@ export default function Sidebar({
                 onDrop={(e) => handleDrop(e, convo.id)}
                 className={`dnd-wrapper${dragId === convo.id ? " dnd-dragging" : ""}${dragOverId === convo.id && dragId !== convo.id ? " dnd-over" : ""}`}
               >
-                <ConvoItem convo={convo} isActive={convo.id === currentConvoId}
+                <ConvoItem convo={activeSessions?.includes(convo.id) ? { ...convo, status: "session_active" } : convo} isActive={convo.id === currentConvoId}
                   onClick={() => onSelectConversation(convo)} onDoubleClick={() => onViewConversationMessages && onViewConversationMessages(convo)} onDelete={onDeleteConversation} onChangeStatus={onChangeStatus} onRename={onRenameConversation} onChangeModel={onChangeModel} currentModel={currentModel} onChangeMode={onChangeMode} convoMode={modeByConvo?.[convo.id] || convo.metadata?.mode} onViewMessages={onViewMessages} onToggleStar={onToggleStar} onChangeAgent={onChangeAgent} agentsList={agents} />
               </div>
             ))}
@@ -409,7 +409,7 @@ export default function Sidebar({
             <div className="empty-section">No conversations yet</div>
           )}
           {otherItems.map((convo) => (
-            <ConvoItem key={convo.id} convo={convo} isActive={convo.id === currentConvoId}
+            <ConvoItem key={convo.id} convo={activeSessions?.includes(convo.id) ? { ...convo, status: "session_active" } : convo} isActive={convo.id === currentConvoId}
               onClick={() => onSelectConversation(convo)} onDoubleClick={() => onViewConversationMessages && onViewConversationMessages(convo)} onDelete={onDeleteConversation} onChangeStatus={onChangeStatus} onRename={onRenameConversation} onChangeModel={onChangeModel} currentModel={currentModel} onChangeMode={onChangeMode} convoMode={modeByConvo?.[convo.id] || convo.metadata?.mode} onViewMessages={onViewMessages} onToggleStar={onToggleStar} onChangeAgent={onChangeAgent} agentsList={agents} />
           ))}
         </div>
