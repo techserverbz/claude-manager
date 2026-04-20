@@ -194,10 +194,11 @@ export class ClaudeManager {
       const prompt = await this.buildFullPrompt(text, imagePaths, agentConfig, conversationId);
       const args = this.buildOneShotArgs(agentConfig, sessionId);
       const env = this.buildEnv();
-      // Resolve cwd from session file when resuming — Claude --resume requires matching project hash
+      // CWD cascade: agentConfig.workingDirectory (metadata, explicit) → JSONL → default
       const sessionCwd = sessionId ? this._resolveSessionCwd(sessionId) : null;
-      const cwd = sessionCwd || agentConfig?.workingDirectory || "C:/Users/Shubham(Code)";
-      if (sessionCwd) console.log(`[OneShot] Resolved session ${sessionId.slice(0, 8)} cwd: ${sessionCwd}`);
+      const cwd = agentConfig?.workingDirectory || sessionCwd || "C:/Users/Shubham(Code)";
+      if (agentConfig?.workingDirectory) console.log(`[OneShot] Metadata cwd: ${cwd}`);
+      else if (sessionCwd) console.log(`[OneShot] JSONL session ${sessionId.slice(0, 8)} cwd: ${sessionCwd}`);
 
       const activity = onActivity || (() => {});
       const rawEvent = onRawEvent || (() => {});
@@ -307,8 +308,9 @@ export class ClaudeManager {
       const env = this.buildEnv();
       // Resolve cwd from session file when resuming — Claude --resume requires matching project hash
       const sessionCwd = sessionId ? this._resolveSessionCwd(sessionId) : null;
-      const cwd = sessionCwd || agentConfig?.workingDirectory || "C:/Users/Shubham(Code)";
-      if (sessionCwd) console.log(`[Persistent] Resolved session ${sessionId.slice(0, 8)} cwd: ${sessionCwd}`);
+      const cwd = agentConfig?.workingDirectory || sessionCwd || "C:/Users/Shubham(Code)";
+      if (agentConfig?.workingDirectory) console.log(`[Persistent] Metadata cwd: ${cwd}`);
+      else if (sessionCwd) console.log(`[Persistent] JSONL session ${sessionId.slice(0, 8)} cwd: ${sessionCwd}`);
 
       console.log(`[Persistent] Spawning: claude ${args.join(" ")}`);
       const child = spawn("claude", args, { cwd, env, shell: true, stdio: ["pipe", "pipe", "pipe"] });

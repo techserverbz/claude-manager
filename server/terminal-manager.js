@@ -155,14 +155,20 @@ export class TerminalManager {
     const pty = await import("node-pty");
 
     const env = this._buildEnv();
-    // When resuming a session, use the original working directory where the session was created
-    let cwd = config?.workingDirectory || process.env.USERPROFILE || "C:/Users/Shubham(Code)";
+    // CWD cascade: conversation metadata (explicit user setting) → JSONL (historical) → default
+    // Metadata wins because the user may have updated it after the session was created.
+    let cwd = process.env.USERPROFILE || "C:/Users/Shubham(Code)";
     if (config?.sessionId) {
       const sessionCwd = findSessionCwd(config.sessionId);
       if (sessionCwd) {
         cwd = sessionCwd;
-        console.log(`[Terminal] Resolved session ${config.sessionId.slice(0, 8)} cwd: ${cwd}`);
+        console.log(`[Terminal] JSONL session ${config.sessionId.slice(0, 8)} cwd: ${cwd}`);
       }
+    }
+    // Conversation metadata cwd OVERRIDES JSONL cwd (user may have corrected the path)
+    if (config?.workingDirectory) {
+      cwd = config.workingDirectory;
+      console.log(`[Terminal] Metadata override cwd: ${cwd}`);
     }
 
     // Find Git Bash
