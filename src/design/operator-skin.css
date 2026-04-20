@@ -362,6 +362,22 @@
   border-radius: var(--r-2) !important;
   box-shadow: var(--shadow-pop) !important;
   padding: 6px !important;
+  z-index: 1000 !important;
+}
+
+/* Ensure the dropdown's host (and its containing section) sit ABOVE the
+   sidebar-scroll stacking context. Without this, the mode popup renders
+   behind starred/recent convo rows. */
+.sidebar-actions,
+.new-chat-wrapper {
+  position: relative !important;
+  z-index: 20 !important;
+}
+.new-chat-wrapper .mode-dropdown {
+  /* Opaque background so convo rows below can't bleed through even if
+     a browser decides to composite weirdly. */
+  background: var(--ink-2) !important;
+  backdrop-filter: none !important;
 }
 
 .ctx-item {
