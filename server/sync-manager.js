@@ -18,7 +18,7 @@ const REPOS = {
     label: "Karpathy Brain — Personal",
     description: "Self-building wiki for solo Claude Code users",
     clonePath: () => path.join(CLAUDE_HOME, "wiki", "karpathy-brain"),
-    installCmd: (clonePath) => `cd "${clonePath}" && bash install.sh`,
+    installCmd: (clonePath) => `cd "${clonePath}" && "C:/Program Files/Git/bin/bash.exe" install.sh`,
   },
   "karpathy-services": {
     owner: "techserverbz",
@@ -310,7 +310,7 @@ export class SyncManager {
       if (fs.existsSync(path.join(clonePath, ".git"))) {
         // Update: git pull + run install.sh
         const pullOutput = execSync("git pull", { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
-        const installOutput = execSync("bash install.sh", { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
+        const installOutput = execSync("\"C:/Program Files/Git/bin/bash.exe\" install.sh", { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
         const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
 
         return {
@@ -328,7 +328,7 @@ export class SyncManager {
           `git clone "${repoUrl}" "${path.basename(clonePath)}"`,
           { cwd: wikiDir, encoding: "utf-8", timeout: 60000 }
         ).trim();
-        const installOutput = execSync("bash install.sh", { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
+        const installOutput = execSync("\"C:/Program Files/Git/bin/bash.exe\" install.sh", { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
         const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
 
         return {
@@ -361,7 +361,7 @@ export class SyncManager {
         // If servicePath given, run install.sh
         let installOutput = "";
         if (servicePath) {
-          installOutput = execSync(`bash install.sh "${servicePath}"`, { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
+          installOutput = execSync(`"C:/Program Files/Git/bin/bash.exe" install.sh "${servicePath}"`, { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
         }
 
         const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
@@ -385,7 +385,7 @@ export class SyncManager {
 
         let installOutput = "";
         if (servicePath) {
-          installOutput = execSync(`bash install.sh "${servicePath}"`, { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
+          installOutput = execSync(`"C:/Program Files/Git/bin/bash.exe" install.sh "${servicePath}"`, { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
         }
 
         const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
