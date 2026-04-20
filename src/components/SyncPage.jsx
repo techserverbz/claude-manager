@@ -222,11 +222,15 @@ export default function SyncPage({ onClose }) {
                           const data = await res.json();
                           setActionResult({ target: `svc-sync-${svc.name}`, ...data });
                           await fetchStatus();
-                          // Re-check after sync
+                          // Re-check after sync with the new commit
                           try {
-                            const cr = await fetch(`/api/sync/karpathy-services/check`, { method: "POST" });
+                            const cr = await fetch(`/api/sync/karpathy-services/check`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ localCommit: data.commit }),
+                            });
                             const cd = await cr.json();
-                            setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: { ...cd, local: { ...cd.local, commit: data.commit } } }));
+                            setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: cd }));
                           } catch {}
                         } catch (err) {
                           setActionResult({ target: `svc-sync-${svc.name}`, success: false, error: err.message });
