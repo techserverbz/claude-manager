@@ -154,22 +154,53 @@ export default function SyncPage({ onClose }) {
         {target.key === "karpathy-services" && s.services && s.services.length > 0 && (
           <div className="sync-services">
             <div className="sync-services-head">Registered Services</div>
-            {s.services.map((svc, i) => (
-              <div key={i} className="sync-service-item">
-                <div className="sync-service-row">
-                  <span className="sync-service-name">{svc.name}</span>
-                  <span className="sync-mono">{svc.commit || "no sync"}</span>
-                  {svc.wikiActive && <span className="sync-chip sync-chip--ok" style={{fontSize:9,height:16,padding:"0 6px"}}>Wiki Active</span>}
+            {s.services.map((svc, i) => {
+              const svcLoading = actionLoading === `svc-${svc.name}`;
+              const svcResult = actionResult?.target === `svc-${svc.name}` ? actionResult : null;
+              return (
+                <div key={i} className="sync-service-item">
+                  <div className="sync-service-row">
+                    <span className="sync-service-name">{svc.name}</span>
+                    <span className="sync-mono">{svc.commit || "no sync"}</span>
+                    {svc.wikiActive && <span className="sync-chip sync-chip--ok" style={{fontSize:9,height:16,padding:"0 6px"}}>Wiki Active</span>}
+                    <button
+                      className="sync-btn sync-btn--sm"
+                      disabled={!!actionLoading}
+                      onClick={async () => {
+                        setActionLoading(`svc-${svc.name}`);
+                        setActionResult(null);
+                        try {
+                          const res = await fetch(`/api/sync/karpathy-services/install`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ servicePath: svc.claudePath }),
+                          });
+                          const data = await res.json();
+                          setActionResult({ target: `svc-${svc.name}`, ...data });
+                          await fetchStatus();
+                        } catch (err) {
+                          setActionResult({ target: `svc-${svc.name}`, success: false, error: err.message });
+                        } finally { setActionLoading(null); }
+                      }}
+                    >
+                      {svcLoading ? "Updating..." : "Sync"}
+                    </button>
+                  </div>
+                  <div className="sync-service-details">
+                    {svc.wikiPath && <span className="sync-mono sync-path" title={svc.wikiPath}>Wiki: {svc.wikiPath}</span>}
+                    {svc.claudePath && <span className="sync-mono sync-path" title={svc.claudePath}>.claude: {svc.claudePath}</span>}
+                    {svc.rawLogs !== undefined && <span className="sync-mono">{svc.rawLogs} raw logs</span>}
+                    {svc.pageCategories !== undefined && <span className="sync-mono">{svc.pageCategories} categories</span>}
+                    {svc.note && <span className="sync-mono" style={{color:"var(--amber)"}}>{svc.note}</span>}
+                  </div>
+                  {svcResult && (
+                    <div className={`sync-action-result ${svcResult.success ? "is-ok" : "is-error"}`} style={{margin:"6px 0 0",padding:"6px 12px",fontSize:11}}>
+                      {svcResult.success ? <span>Updated to <b>{svcResult.commit}</b></span> : <span>{svcResult.error}</span>}
+                    </div>
+                  )}
                 </div>
-                <div className="sync-service-details">
-                  {svc.wikiPath && <span className="sync-mono sync-path" title={svc.wikiPath}>Wiki: {svc.wikiPath}</span>}
-                  {svc.claudePath && <span className="sync-mono sync-path" title={svc.claudePath}>.claude: {svc.claudePath}</span>}
-                  {svc.rawLogs !== undefined && <span className="sync-mono">{svc.rawLogs} raw logs</span>}
-                  {svc.pageCategories !== undefined && <span className="sync-mono">{svc.pageCategories} categories</span>}
-                  {svc.note && <span className="sync-mono" style={{color:"var(--amber)"}}>{svc.note}</span>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -500,6 +531,12 @@ export default function SyncPage({ onClose }) {
           box-shadow:var(--shadow-inset-hairline-strong);
         }
         .sync-btn:disabled { opacity:0.5; cursor:default; }
+
+        .sync-btn--sm {
+          padding:4px 12px; font-size:10px; height:24px;
+          letter-spacing:var(--track-wider); text-transform:uppercase;
+          margin-left:auto; flex-shrink:0;
+        }
 
         .sync-btn--primary {
           background:var(--acid);
