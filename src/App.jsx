@@ -1032,15 +1032,18 @@ export default function App() {
         ) : settingsOverlay === "healthCheck" ? (
           <HealthCheckPage onClose={() => setSettingsOverlay(null)} />
         ) : settingsOverlay === "cronJobs" ? (
-          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:"var(--font-sans)"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"1px solid var(--border)",background:"var(--bg-secondary)",flexShrink:0}}>
-              <h2 style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",margin:0}}>Cron Jobs</h2>
+          <div className="cron-page" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:"var(--ff-ui)",background:"var(--ink-0)",position:"relative"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"20px 28px 18px",boxShadow:"inset 0 -1px 0 var(--rule-1)",position:"relative",zIndex:1}}>
+              <h2 style={{fontFamily:"var(--ff-serif)",fontStyle:"italic",fontWeight:400,fontSize:32,letterSpacing:"var(--track-editorial)",color:"var(--paper-0)",margin:0,lineHeight:1,position:"relative",paddingTop:18}}>
+                <span style={{position:"absolute",top:0,left:0,fontFamily:"var(--ff-mono)",fontStyle:"normal",fontSize:9,fontWeight:500,letterSpacing:"var(--track-wider)",textTransform:"uppercase",color:"var(--paper-3)"}}>SCHEDULED</span>
+                Cron Jobs
+              </h2>
               <button className="btn-icon" onClick={() => setSettingsOverlay(null)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
             </div>
-            <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:"var(--text-muted)",fontSize:14,padding:40}}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-              <p>Cron jobs are managed via the <code style={{background:"var(--bg-tertiary)",padding:"2px 6px",borderRadius:4,fontFamily:"var(--font-mono)",fontSize:12}}>/loop</code> skill in chat.</p>
-              <p style={{fontSize:12,color:"var(--text-ghost)"}}>Example: /loop 5m /your-command</p>
+            <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:40,position:"relative",zIndex:1}}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.35}}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              <p style={{fontFamily:"var(--ff-serif)",fontStyle:"italic",fontSize:18,color:"var(--paper-2)",margin:0}}>Cron jobs are managed via <code style={{background:"var(--ink-2)",padding:"2px 8px",borderRadius:2,fontFamily:"var(--ff-mono)",fontSize:12,boxShadow:"var(--shadow-inset-hairline)"}}>/loop</code> in chat.</p>
+              <p style={{fontFamily:"var(--ff-mono)",fontSize:10.5,color:"var(--paper-3)",letterSpacing:"var(--track-wide)"}}>Example: /loop 5m /your-command</p>
             </div>
           </div>
         ) : multiView ? (
