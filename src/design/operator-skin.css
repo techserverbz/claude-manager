@@ -507,7 +507,31 @@
   color: var(--paper-0) !important;
   margin: 0 !important;
   line-height: 1 !important;
+  position: relative !important;
+  padding-top: 18px !important;
 }
+
+/* Eyebrow labels above each title */
+.agents-header h2::before,
+.cp-header h2::before,
+.cp-title::before,
+.session-browser-header h2::before,
+.task-header h2::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--ff-mono);
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
+  color: var(--paper-3);
+}
+.cp-header h2::before, .cp-title::before { content: "INTEGRATIONS"; }
+.task-header h2::before { content: "PLANNER"; }
+.agents-header h2::before { content: "CHAT AGENTS"; }
+.session-browser-header h2::before { content: "REPLAY"; }
 
 /* Close/back buttons */
 .agents-header .btn-icon,
