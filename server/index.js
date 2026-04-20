@@ -947,7 +947,8 @@ app.post("/api/conversations/:id/terminal/start", async (req, res) => {
 
     const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
     const mode = meta.mode || "terminal-persistent";
-    const termConfig = { sessionId: convo.claude_session_id };
+    const convoCwd = meta.cwd || meta.workingDirectory;
+    const termConfig = { sessionId: convo.claude_session_id, ...(convoCwd ? { workingDirectory: convoCwd } : {}) };
 
     const agent = convo.agent || memoryManager.getMode();
     const tailerCallback = (role, content, timestamp) => {
@@ -1074,6 +1075,10 @@ app.post("/api/conversations/:id/dispatch", async (req, res) => {
     const isMaster = meta.master === true;
     const agentConfig = isMaster ? getMasterChatConfig() : await getChristopherConfig();
     if (isMaster) keepAliveConversations.add(conversationId);
+
+    // Use conversation-specific cwd if stored (from "open from directory" feature)
+    const convoCwd = meta.cwd || meta.workingDirectory;
+    if (convoCwd) agentConfig.workingDirectory = convoCwd;
 
     const useKeepAlive = keepAliveConversations.has(conversationId);
     const sendFn = useKeepAlive
@@ -2000,7 +2005,9 @@ io.on("connection", (socket) => {
       // Check if this is the master chat — add master chat CLAUDE.md dir
       const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
       const isMasterConvo = meta.master === true;
-      const termConfig = { ...config, sessionId: convo.claude_session_id };
+      // Pass conversation-specific cwd so terminal spawns in the right directory
+      const convoCwd = meta.cwd || meta.workingDirectory;
+      const termConfig = { ...config, sessionId: convo.claude_session_id, ...(convoCwd ? { workingDirectory: convoCwd } : {}) };
       if (isMasterConvo) {
         termConfig.addDirs = [path.join(CHRISTOPHER_HOME, "config", "master-chat")];
       }
@@ -2156,6 +2163,9 @@ io.on("connection", (socket) => {
       const meta = typeof convo.metadata === "string" ? JSON.parse(convo.metadata || "{}") : (convo.metadata || {});
       const isMaster = meta.master === true;
       const agentConfig = isMaster ? getMasterChatConfig() : await getChristopherConfig();
+      // Use conversation-specific cwd if stored
+      const convoCwd = meta.cwd || meta.workingDirectory;
+      if (convoCwd) agentConfig.workingDirectory = convoCwd;
       if (isMaster) keepAliveConversations.add(convo.id);
       const job = { text, imagePaths, convo, agentConfig };
       const q = getConvoQueue(convo.id);
