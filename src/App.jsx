@@ -1150,15 +1150,6 @@ export default function App() {
           />
         )}
 
-        {currentMode === "terminal-persistent" && (
-          <VoiceOrb
-            isListening={isListening}
-            isSpeaking={false}
-            isThinking={isThinking}
-            onToggle={toggleListening}
-            onStop={() => socketRef.current?.emit("chat:stop", { conversationId: currentConvoId })}
-          />
-        )}
       </main>
     </div>
   );
