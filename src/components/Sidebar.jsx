@@ -285,10 +285,22 @@ export default function Sidebar({
               ))}
               <div className="mode-dir-section">
                 <label className="mode-dir-label">Directory</label>
-                <select className="mode-dir-select" value={newConvoDir} onChange={(e) => setNewConvoDir(e.target.value)} onClick={(e) => e.stopPropagation()}>
-                  <option value="">{defaultDir ? `Default: ${defaultDir.split(/[/\\]/).pop()}` : "Home directory"}</option>
-                  {savedDirs.map(d => <option key={d.id} value={d.path}>{d.name}</option>)}
-                </select>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <select className="mode-dir-select" style={{ flex: 1 }} value={newConvoDir} onChange={(e) => setNewConvoDir(e.target.value)} onClick={(e) => e.stopPropagation()}>
+                    <option value="">{defaultDir ? `Default: ${defaultDir.split(/[/\\]/).pop()}` : "Home directory"}</option>
+                    {savedDirs.map(d => <option key={d.id} value={d.path}>{d.name}</option>)}
+                  </select>
+                  {newConvoDir && savedDirs.some(d => d.path === newConvoDir) && (
+                    <button className="mode-dir-add-btn" style={{ color: "var(--flame)", borderColor: "color-mix(in srgb, var(--flame) 40%, transparent)", padding: "2px 6px", fontSize: 9 }} title="Remove this saved directory" onClick={async (e) => {
+                      e.stopPropagation();
+                      const dir = savedDirs.find(d => d.path === newConvoDir);
+                      if (!dir || !confirm(`Remove saved directory "${dir.name}"?`)) return;
+                      await fetch(`/api/directories/${dir.id}`, { method: "DELETE" });
+                      const res = await fetch("/api/directories"); setSavedDirs(await res.json());
+                      setNewConvoDir("");
+                    }}>×</button>
+                  )}
+                </div>
                 <input className="mode-dir-input" placeholder="Or paste a path to override..." value={newConvoDir}
                   onChange={(e) => setNewConvoDir(e.target.value)}
                   onClick={(e) => e.stopPropagation()} />
