@@ -204,16 +204,19 @@ export default function SyncPage({ onClose }) {
           </div>
         )}
 
-        {/* Service install path input (for karpathy-services when not installed) */}
+        {/* Add new service */}
         {target.key === "karpathy-services" && (
           <div className="sync-service-install">
-            <label className="sync-label" style={{ marginBottom: 4, display: "block" }}>Service .claude path (for install)</label>
+            <label className="sync-label" style={{ marginBottom: 4, display: "block" }}>Add New Service</label>
             <input
               className="sync-input"
               value={serviceInstallPath}
               onChange={e => setServiceInstallPath(e.target.value)}
-              placeholder="I:/My Drive/Real Estate/.claude"
+              placeholder="I:/My Drive/Real Estate"
             />
+            <span style={{ fontSize: 10, color: "var(--paper-3)", marginTop: 4, display: "block" }}>
+              Paste the project root (e.g. I:/My Drive/Real Estate). The .claude folder will be found automatically.
+            </span>
           </div>
         )}
 
