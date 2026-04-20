@@ -1337,7 +1337,8 @@ app.get("/api/sync/status", async (req, res) => {
 
 app.post("/api/sync/:target/check", async (req, res) => {
   try {
-    const result = await syncManager.checkForUpdates(req.params.target);
+    const { localCommit } = req.body || {};
+    const result = await syncManager.checkForUpdates(req.params.target, localCommit || null);
     res.json(result);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

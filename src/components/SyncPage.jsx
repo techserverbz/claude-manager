@@ -193,9 +193,13 @@ export default function SyncPage({ onClose }) {
                       onClick={async () => {
                         setActionLoading(`svc-check-${svc.name}`);
                         try {
-                          const res = await fetch(`/api/sync/karpathy-services/check`, { method: "POST" });
+                          const res = await fetch(`/api/sync/karpathy-services/check`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ localCommit: svc.commit }),
+                          });
                           const data = await res.json();
-                          setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: { ...data, local: { ...data.local, commit: svc.commit } } }));
+                          setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: data }));
                         } catch (err) {
                           setChecks(prev => ({ ...prev, [`svc-${svc.name}`]: { error: err.message } }));
                         } finally { setActionLoading(null); }

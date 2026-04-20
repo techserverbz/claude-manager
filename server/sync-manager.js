@@ -229,20 +229,19 @@ export class SyncManager {
 
   // --- Check: compare local version with GitHub latest ---
 
-  async checkForUpdates(target) {
+  async checkForUpdates(target, localCommitOverride = null) {
     const repoKey = target === "karpathy-services" ? "karpathy-services" : target;
     const repoInfo = REPOS[repoKey];
     if (!repoInfo) throw new Error(`Unknown target: ${target}`);
 
-    // Fetch latest commit from GitHub
     const latest = await this._fetchLatestCommit(repoInfo.owner, repoInfo.repo);
     if (!latest) throw new Error("Failed to fetch latest commit from GitHub");
 
-    // Get local status
     const status = (await this.getStatus())[target];
-    const localCommit = status?.commitFull || status?.commit || null;
+    const localCommit = localCommitOverride || status?.commitFull || status?.commit || null;
 
-    const isUpToDate = localCommit && latest.sha.startsWith(localCommit.replace(/\.\.\.$/, ""));
+    // Compare: short hash (7 chars) matches start of full SHA
+    const isUpToDate = !!(localCommit && latest.sha.startsWith(localCommit.replace(/\.\.\.$/, "")));
 
     return {
       target,
