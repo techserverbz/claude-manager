@@ -71,7 +71,7 @@ await db.initialize();
 const screenshotService = new ScreenshotService();
 const memoryManager = new MemoryManager(db);
 const brainManager = new BrainManager(db);
-const syncManager = new SyncManager(ROOT, db);
+const syncManager = new SyncManager(ROOT, db, brainManager);
 const healthChecker = new HealthChecker(db, brainManager);
 const claudeManager = new ClaudeManager(ROOT, db, memoryManager);
 const terminalManager = new TerminalManager(ROOT, db);

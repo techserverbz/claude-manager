@@ -30,9 +30,10 @@ const REPOS = {
 };
 
 export class SyncManager {
-  constructor(appRoot, db) {
+  constructor(appRoot, db, brainManager) {
     this.appRoot = appRoot;
     this.db = db;
+    this.brainManager = brainManager;
   }
 
   // --- Status: what's installed and which version ---
@@ -392,59 +393,46 @@ export class SyncManager {
     const { servicePath, clonePath: customClonePath } = options;
     const repoUrl = `https://github.com/${REPOS["karpathy-services"].owner}/${REPOS["karpathy-services"].repo}.git`;
 
-    // We need to know where the clone lives + where to install
-    // If no servicePath given, just update the clone
     const defaultClone = path.join(process.env.USERPROFILE || process.env.HOME, "Desktop", "Github", "karpathy-brain-services");
     const clonePath = customClonePath || defaultClone;
 
     try {
+      let result;
+
       if (fs.existsSync(path.join(clonePath, ".git"))) {
-        // Update clone
         const pullOutput = execSync("git pull", { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
-
-        // If servicePath given, run install.sh
         let installOutput = "";
         if (servicePath) {
           installOutput = execSync(`"C:/Program Files/Git/bin/bash.exe" install.sh "${servicePath}"`, { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
         }
-
         const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
-
-        return {
-          success: true,
-          action: "updated",
-          commit,
-          clonePath,
-          servicePath: servicePath || null,
-          pullOutput: pullOutput.slice(0, 500),
-          installOutput: installOutput.slice(-500),
-        };
+        result = { success: true, action: "updated", commit, clonePath, servicePath: servicePath || null, pullOutput: pullOutput.slice(0, 500), installOutput: installOutput.slice(-500) };
       } else {
-        // Fresh clone
         fs.mkdirSync(path.dirname(clonePath), { recursive: true });
-        const cloneOutput = execSync(
-          `git clone "${repoUrl}" "${path.basename(clonePath)}"`,
-          { cwd: path.dirname(clonePath), encoding: "utf-8", timeout: 60000 }
-        ).trim();
-
+        const cloneOutput = execSync(`git clone "${repoUrl}" "${path.basename(clonePath)}"`, { cwd: path.dirname(clonePath), encoding: "utf-8", timeout: 60000 }).trim();
         let installOutput = "";
         if (servicePath) {
           installOutput = execSync(`"C:/Program Files/Git/bin/bash.exe" install.sh "${servicePath}"`, { cwd: clonePath, encoding: "utf-8", timeout: 30000 }).trim();
         }
-
         const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
-
-        return {
-          success: true,
-          action: "installed",
-          commit,
-          clonePath,
-          servicePath: servicePath || null,
-          cloneOutput: cloneOutput.slice(0, 300),
-          installOutput: installOutput.slice(-500),
-          note: servicePath ? null : "Clone ready. Provide a service path to install hooks.",
-        };
+        result = { success: true, action: "installed", commit, clonePath, servicePath: servicePath || null, cloneOutput: cloneOutput.slice(0, 300), installOutput: installOutput.slice(-500), note: servicePath ? null : "Clone ready. Provide a service path to install hooks." };
       }
+
+      // Auto-register as a brain if servicePath provided and brain doesn't exist yet
+      if (result.success && servicePath && this.brainManager) {
+        try {
+          const serviceName = path.basename(servicePath.replace(/[/\\]\.claude\/?$/, ""));
+          await this.brainManager.addBrain({ name: serviceName, claude_path: servicePath });
+          result.brainRegistered = serviceName;
+        } catch (err) {
+          // Already registered or other non-critical error — don't fail the install
+          if (!err.message?.includes("already exists")) {
+            result.brainNote = `Hooks installed but brain registration failed: ${err.message}`;
+          }
+        }
+      }
+
+      return result;
     } catch (err) {
       return { success: false, error: err.message };
     }
