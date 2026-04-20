@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import "./MemoryModule.css";
-import AddBrainModal from "./AddBrainModal.jsx";
 
 const TYPE_COLORS = { project: "#7c6aef", feedback: "#eab308", user: "#22c55e", reference: "#58a6ff", page: "#94a3b8" };
 const TYPE_ICONS = { project: "\u{1F4CB}", feedback: "\u{1F4AC}", user: "\u{1F464}", reference: "\u{1F517}", page: "\u{1F4C4}" };
@@ -201,21 +200,6 @@ export default function MemoryModule({ onClose }) {
               ))}
             </select>
             {activeBrain && <span className="op-live" title="Live — reads and writes go here" />}
-            <button
-              className="stat memory-stat-add"
-              onClick={() => setShowAddBrain(true)}
-            >
-              + Add service brain
-            </button>
-            {activeBrain && !activeBrain.is_builtin && (
-              <button
-                className="stat memory-stat-danger"
-                onClick={() => removeBrain(activeBrain.id)}
-                title="Remove this service brain"
-              >
-                Remove
-              </button>
-            )}
             <span className="stat memory-stat-metric">
               <span className="op-metric op-metric--acid">{pages.length}</span>
               &nbsp;pages
@@ -402,15 +386,6 @@ export default function MemoryModule({ onClose }) {
         </div>
       </div>
 
-      {showAddBrain && (
-        <AddBrainModal
-          onClose={() => setShowAddBrain(false)}
-          onAdded={async () => {
-            setShowAddBrain(false);
-            await fetchBrains();
-          }}
-        />
-      )}
     </div>
   );
 }
