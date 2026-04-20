@@ -454,6 +454,101 @@
   font-weight: var(--w-mid) !important;
 }
 
+/* ── Settings overlay pages — Operator editorial headers ────────── */
+.agents-page,
+.cp-root,
+.session-browser,
+.task-module {
+  background: var(--ink-0) !important;
+  font-family: var(--ff-ui) !important;
+  position: relative;
+}
+.agents-page::before,
+.cp-root::before,
+.session-browser::before,
+.task-module::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 0;
+}
+.agents-page > *,
+.cp-root > *,
+.session-browser > *,
+.task-module > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Headers — editorial italic serif */
+.agents-header,
+.cp-header,
+.session-browser-header,
+.task-header {
+  background: transparent !important;
+  box-shadow: inset 0 -1px 0 var(--rule-1) !important;
+  border-bottom: none !important;
+  padding: 20px 28px 18px !important;
+}
+
+.agents-header h2,
+.cp-header h2,
+.cp-title,
+.session-browser-header h2,
+.task-header h2 {
+  font-family: var(--ff-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 32px !important;
+  letter-spacing: var(--track-editorial) !important;
+  color: var(--paper-0) !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+}
+
+/* Close/back buttons */
+.agents-header .btn-icon,
+.cp-header .btn-icon,
+.session-browser-header .btn-icon,
+.task-header .btn-icon,
+.task-header-right .btn-icon {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: var(--shadow-inset-hairline) !important;
+  color: var(--paper-3) !important;
+  border-radius: var(--r-1) !important;
+}
+.agents-header .btn-icon:hover,
+.cp-header .btn-icon:hover,
+.session-browser-header .btn-icon:hover,
+.task-header .btn-icon:hover {
+  color: var(--flame) !important;
+  background: color-mix(in srgb, var(--flame) 8%, transparent) !important;
+}
+
+/* List items in these pages */
+.agents-page .agents-list,
+.cp-root .cp-list {
+  background: var(--ink-1) !important;
+  border-radius: var(--r-2) !important;
+  box-shadow: var(--shadow-inset-hairline) !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+/* Cron Jobs inline page — also gets the treatment */
+.cron-jobs-page h2,
+div[style*="Cron Jobs"] h2 {
+  font-family: var(--ff-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 32px !important;
+  letter-spacing: var(--track-editorial) !important;
+}
+
 /* ── Chat panel / CLI panel — minimal lift ──────────────────────── */
 .chat-panel, .cli-panel {
   background: var(--ink-0) !important;
