@@ -300,7 +300,7 @@
 }
 .status-indicator.in_progress  { background: var(--amber) !important; animation: opLivePulse 1.2s var(--ease-editorial) infinite; }
 .status-indicator.waiting_for_user { background: var(--azure) !important; }
-.status-indicator.completed    { background: var(--mint) !important; }
+.status-indicator.completed    { background: var(--paper-3) !important; } /* neutral grey — completed is a passive state, not a live signal */
 .status-indicator.error        { background: var(--flame) !important; }
 .status-indicator.local        { background: var(--paper-3) !important; }
 
