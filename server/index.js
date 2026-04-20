@@ -14,6 +14,7 @@ import { Database } from "./db.js";
 import { MemoryManager } from "./memory-manager.js";
 import { BrainManager, WIKI_CATEGORY_LIST } from "./brain-manager.js";
 import { SyncManager } from "./sync-manager.js";
+import { HealthChecker } from "./health-check.js";
 import { createTaskRouter } from "./task-routes.js";
 import { createCrmProxyRouter } from "./crm-proxy.js";
 
@@ -71,6 +72,7 @@ const screenshotService = new ScreenshotService();
 const memoryManager = new MemoryManager(db);
 const brainManager = new BrainManager(db);
 const syncManager = new SyncManager(ROOT, db);
+const healthChecker = new HealthChecker(db, brainManager);
 const claudeManager = new ClaudeManager(ROOT, db, memoryManager);
 const terminalManager = new TerminalManager(ROOT, db);
 const sessionReader = new SessionReader();
@@ -1353,6 +1355,15 @@ app.post("/api/sync/:target/install", async (req, res) => {
     const { servicePath, clonePath } = req.body || {};
     const result = await syncManager.install(req.params.target, { servicePath, clonePath });
     res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- Health Check API ---
+
+app.get("/api/health/diagnostics", async (req, res) => {
+  try {
+    const results = await healthChecker.runAll();
+    res.json(results);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
