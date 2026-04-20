@@ -149,10 +149,19 @@ export default function SyncPage({ onClose }) {
           <div className="sync-services">
             <div className="sync-services-head">Registered Services</div>
             {s.services.map((svc, i) => (
-              <div key={i} className="sync-service-row">
-                <span className="sync-service-name">{svc.name}</span>
-                <span className="sync-mono">{svc.commit || "no sync"}</span>
-                {svc.commitDate && <span className="sync-mono">{new Date(svc.commitDate).toLocaleDateString()}</span>}
+              <div key={i} className="sync-service-item">
+                <div className="sync-service-row">
+                  <span className="sync-service-name">{svc.name}</span>
+                  <span className="sync-mono">{svc.commit || "no sync"}</span>
+                  {svc.wikiActive && <span className="sync-chip sync-chip--ok" style={{fontSize:9,height:16,padding:"0 6px"}}>Wiki Active</span>}
+                </div>
+                <div className="sync-service-details">
+                  {svc.wikiPath && <span className="sync-mono sync-path" title={svc.wikiPath}>Wiki: {svc.wikiPath}</span>}
+                  {svc.claudePath && <span className="sync-mono sync-path" title={svc.claudePath}>.claude: {svc.claudePath}</span>}
+                  {svc.rawLogs !== undefined && <span className="sync-mono">{svc.rawLogs} raw logs</span>}
+                  {svc.pageCategories !== undefined && <span className="sync-mono">{svc.pageCategories} categories</span>}
+                  {svc.note && <span className="sync-mono" style={{color:"var(--amber)"}}>{svc.note}</span>}
+                </div>
               </div>
             ))}
           </div>
@@ -396,11 +405,22 @@ export default function SyncPage({ onClose }) {
           box-shadow: inset 0 -1px 0 var(--rule-0);
           font-size:12px;
         }
+        .sync-service-item {
+          padding:8px 0;
+          box-shadow: inset 0 -1px 0 var(--rule-0);
+        }
+        .sync-service-item:last-child { box-shadow:none; }
         .sync-service-row:last-child { box-shadow:none; }
         .sync-service-name {
           font-family:var(--ff-ui); font-weight:var(--w-mid);
           color:var(--paper-0); flex:1;
         }
+        .sync-service-details {
+          display:flex; flex-direction:column; gap:2px;
+          padding:4px 0 0 0;
+          font-size:10.5px;
+        }
+        .sync-service-details .sync-path { font-size:10.5px; }
 
         .sync-service-install {
           padding:12px 24px;

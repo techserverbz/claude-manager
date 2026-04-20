@@ -164,25 +164,50 @@ export class SyncManager {
 
     const services = [];
     for (const brain of brains) {
-      const syncLog = path.join(brain.claude_path, "wiki", "_state", "karpathy_sync.json");
+      const wikiRoot = path.join(brain.claude_path, "wiki");
+      const wikiPagesDir = path.join(wikiRoot, "wiki");
+      const syncLog = path.join(wikiRoot, "_state", "karpathy_sync.json");
+
+      const svc = {
+        name: brain.name,
+        claudePath: brain.claude_path,
+        wikiPath: wikiRoot,
+      };
+
+      // Count wiki data
+      if (fs.existsSync(wikiPagesDir)) {
+        try {
+          svc.pageCategories = fs.readdirSync(wikiPagesDir).filter(d => {
+            try { return fs.statSync(path.join(wikiPagesDir, d)).isDirectory(); } catch { return false; }
+          }).length;
+        } catch {}
+        try {
+          const rawDir = path.join(wikiRoot, "raw");
+          svc.rawLogs = fs.existsSync(rawDir)
+            ? fs.readdirSync(rawDir).filter(f => f.endsWith(".md")).length
+            : 0;
+        } catch {}
+        svc.wikiActive = true;
+      }
+
+      // Sync log
       if (fs.existsSync(syncLog)) {
         try {
           const log = JSON.parse(fs.readFileSync(syncLog, "utf-8"));
-          services.push({
-            name: brain.name,
-            claudePath: brain.claude_path,
-            commit: log.git_commit_short || log.git_commit?.slice(0, 7),
-            commitDate: log.git_commit_date,
-            commitMessage: log.git_commit_message,
-            installedAt: log.installed_at,
-            installedBy: log.installed_by,
-          });
+          svc.commit = log.git_commit_short || log.git_commit?.slice(0, 7);
+          svc.commitDate = log.git_commit_date;
+          svc.commitMessage = log.git_commit_message;
+          svc.installedAt = log.installed_at;
+          svc.installedBy = log.installed_by;
         } catch {
-          services.push({ name: brain.name, claudePath: brain.claude_path, commit: null, note: "sync log unreadable" });
+          svc.note = "sync log unreadable";
         }
       } else {
-        services.push({ name: brain.name, claudePath: brain.claude_path, commit: null, note: "no sync log" });
+        svc.commit = null;
+        svc.note = svc.wikiActive ? "Wiki active but no sync log — click Install to connect" : "no sync log";
       }
+
+      services.push(svc);
     }
 
     return { ...info, installed: services.length > 0, services };
