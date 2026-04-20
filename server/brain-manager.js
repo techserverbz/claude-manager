@@ -158,27 +158,26 @@ export class BrainManager {
     for (const cat of categories) {
       const catDir = path.join(pagesRoot, cat);
       if (!fs.existsSync(catDir)) continue;
-      try {
-        const files = fs.readdirSync(catDir).filter(f => f.endsWith(".md"));
-        for (const f of files) {
-          const full = path.join(catDir, f);
-          try {
-            const stat = fs.statSync(full);
-            const content = fs.readFileSync(full, "utf-8");
-            const meta = this._parseFrontmatter(content);
-            const body = content.replace(/^---[\s\S]*?---\n*/, "").trim();
-            pages.push({
-              category: cat,
-              slug: f.replace(/\.md$/, ""),
-              name: meta.name || f.replace(/\.md$/, "").replace(/-/g, " "),
-              type: meta.type || null,
-              last_modified: stat.mtime.toISOString(),
-              excerpt: body.slice(0, 200),
-              frontmatter: meta
-            });
-          } catch {}
-        }
-      } catch {}
+      // Recursive scan — finds .md files at any depth under category
+      this._walkMdFiles(catDir, (full, relPath) => {
+        try {
+          const stat = fs.statSync(full);
+          const content = fs.readFileSync(full, "utf-8");
+          const meta = this._parseFrontmatter(content);
+          const body = content.replace(/^---[\s\S]*?---\n*/, "").trim();
+          const slug = relPath.replace(/\.md$/, "").replace(/\\/g, "/");
+          pages.push({
+            category: cat,
+            slug,
+            name: meta.name || slug.split("/").pop().replace(/-/g, " "),
+            type: meta.type || meta.category || null,
+            last_modified: stat.mtime.toISOString(),
+            excerpt: body.slice(0, 200),
+            frontmatter: meta,
+            subpath: relPath.includes("/") || relPath.includes("\\") ? relPath.replace(/\\/g, "/") : null,
+          });
+        } catch {}
+      });
     }
 
     pages.sort((a, b) => (a.last_modified < b.last_modified ? 1 : -1));
@@ -564,6 +563,23 @@ export class BrainManager {
     seed(path.join(wiki, "wiki", "log.md"), "# Wiki Operations Log\n");
     seed(path.join(wiki, "_state", "counter.txt"), "0");
     seed(path.join(wiki, "_state", "total_counter.txt"), "0");
+  }
+
+  _walkMdFiles(dir, callback, prefix = "") {
+    try {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        const full = path.join(dir, entry);
+        try {
+          const stat = fs.statSync(full);
+          if (stat.isDirectory()) {
+            this._walkMdFiles(full, callback, prefix ? `${prefix}/${entry}` : entry);
+          } else if (entry.endsWith(".md")) {
+            callback(full, prefix ? `${prefix}/${entry}` : entry);
+          }
+        } catch {}
+      }
+    } catch {}
   }
 
   _listCategoryFolders(pagesRoot) {
