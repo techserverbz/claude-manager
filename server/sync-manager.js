@@ -81,9 +81,28 @@ export class SyncManager {
   async _getKarpathyPersonalStatus() {
     const info = { ...REPOS["karpathy-personal"], target: "karpathy-personal" };
     const clonePath = REPOS["karpathy-personal"].clonePath();
+    const wikiRoot = path.join(CLAUDE_HOME, "wiki");
+    const claudePath = CLAUDE_HOME;
+
+    // Common wiki stats (always computed)
+    let wikiStats = {};
+    const wikiPagesDir = path.join(wikiRoot, "wiki");
+    if (fs.existsSync(wikiPagesDir)) {
+      try {
+        wikiStats.pageCategories = fs.readdirSync(wikiPagesDir).filter(d => {
+          try { return fs.statSync(path.join(wikiPagesDir, d)).isDirectory(); } catch { return false; }
+        }).length;
+      } catch {}
+      try {
+        const rawDir = path.join(wikiRoot, "raw");
+        wikiStats.rawLogs = fs.existsSync(rawDir)
+          ? fs.readdirSync(rawDir).filter(f => f.endsWith(".md")).length : 0;
+      } catch {}
+      wikiStats.wikiActive = true;
+    }
 
     // Check sync log first (survives .git deletion)
-    const syncLog = path.join(CLAUDE_HOME, "wiki", "_state", "karpathy_sync.json");
+    const syncLog = path.join(wikiRoot, "_state", "karpathy_sync.json");
     if (fs.existsSync(syncLog)) {
       try {
         const log = JSON.parse(fs.readFileSync(syncLog, "utf-8"));
@@ -98,8 +117,11 @@ export class SyncManager {
           installedBy: log.installed_by,
           remote: log.git_remote,
           clonePath,
+          wikiPath: wikiRoot,
+          claudePath,
           syncLogPath: syncLog,
           hasClone: fs.existsSync(path.join(clonePath, ".git")),
+          ...wikiStats,
         };
       } catch {}
     }
@@ -114,8 +136,11 @@ export class SyncManager {
           commit: commit.slice(0, 7),
           commitFull: commit,
           clonePath,
+          wikiPath: wikiRoot,
+          claudePath,
           hasClone: true,
           note: "No sync log — run install.sh to create one",
+          ...wikiStats,
         };
       } catch {}
     }

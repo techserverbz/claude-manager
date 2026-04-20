@@ -117,6 +117,12 @@ export default function SyncPage({ onClose }) {
                 <span className="sync-mono sync-path">{s.path}</span>
               </div>
             )}
+            {s.claudePath && (
+              <div className="sync-row">
+                <span className="sync-label">.claude</span>
+                <span className="sync-mono sync-path">{s.claudePath}</span>
+              </div>
+            )}
             {s.wikiPath && (
               <div className="sync-row">
                 <span className="sync-label">Wiki</span>
