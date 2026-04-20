@@ -121,7 +121,7 @@ IMPORTANT: You CANNOT edit your own source code.
 - Active brain: **${brainName}** at ${CLAUDE_HOME_PATH}
 - Agents (coding/personal) are for chat organization only. Memory lives in the brain's wiki.
 - WRITE memory pages to: ${CLAUDE_HOME_PATH}/wiki/wiki/{category}/{slug}.md
-  Categories: ${WIKI_CATEGORY_LIST.join(", ")}
+  Categories: (dynamic — whatever folders exist in wiki/wiki/)
 - Raw session logs (auto): ${CLAUDE_HOME_PATH}/wiki/raw/{YYYY-MM-DD-HH-MM}.md
 - Planner: ${CLAUDE_HOME_PATH}/wiki/{tasks,reminders,calendar,short-term}.md
 - Skills: ${CLAUDE_HOME_PATH}/skills/
@@ -1431,10 +1431,13 @@ app.get("/api/brains/:id/pages", async (req, res) => {
     const brain = await brainManager.getBrainById(req.params.id);
     if (!brain) return res.status(404).json({ error: "brain not found" });
     const { category } = req.query;
+    const pages = brainManager.listPages(brain, category || null);
+    // Derive categories from actual folders on disk, not a predefined list
+    const actualCategories = [...new Set(pages.map(p => p.category))].sort();
     res.json({
       brain: { id: brain.id, name: brain.name, claude_path: brain.claude_path },
-      categories: WIKI_CATEGORY_LIST,
-      pages: brainManager.listPages(brain, category || null)
+      categories: actualCategories,
+      pages,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
