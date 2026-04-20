@@ -13,6 +13,7 @@ import { ScreenshotService } from "./screenshot.js";
 import { Database } from "./db.js";
 import { MemoryManager } from "./memory-manager.js";
 import { BrainManager, WIKI_CATEGORY_LIST } from "./brain-manager.js";
+import { SyncManager } from "./sync-manager.js";
 import { createTaskRouter } from "./task-routes.js";
 import { createCrmProxyRouter } from "./crm-proxy.js";
 
@@ -69,6 +70,7 @@ await db.initialize();
 const screenshotService = new ScreenshotService();
 const memoryManager = new MemoryManager(db);
 const brainManager = new BrainManager(db);
+const syncManager = new SyncManager(ROOT, db);
 const claudeManager = new ClaudeManager(ROOT, db, memoryManager);
 const terminalManager = new TerminalManager(ROOT, db);
 const sessionReader = new SessionReader();
@@ -1328,6 +1330,30 @@ app.get("/api/screenshots", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- Sync API ---
+
+app.get("/api/sync/status", async (req, res) => {
+  try {
+    const status = await syncManager.getStatus();
+    res.json(status);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/sync/:target/check", async (req, res) => {
+  try {
+    const result = await syncManager.checkForUpdates(req.params.target);
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/sync/:target/install", async (req, res) => {
+  try {
+    const { servicePath, clonePath } = req.body || {};
+    const result = await syncManager.install(req.params.target, { servicePath, clonePath });
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- Brain API (new) ---

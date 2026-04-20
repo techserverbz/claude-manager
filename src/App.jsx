@@ -11,6 +11,7 @@ import SkillsPage from "./components/SkillsPage.jsx";
 import ConnectorsPage from "./components/ConnectorsPage.jsx";
 import MemoryModule from "./components/MemoryModule/MemoryModule.jsx";
 import AgentsPage from "./components/AgentsPage.jsx";
+import SyncPage from "./components/SyncPage.jsx";
 import "./App.css";
 
 // Always connect to the same origin (works for both dev and prod since Express serves the frontend)
@@ -1023,6 +1024,8 @@ export default function App() {
           <MemoryModule onClose={() => setSettingsOverlay(null)} />
         ) : settingsOverlay === "agents" ? (
           <AgentsPage onClose={() => setSettingsOverlay(null)} />
+        ) : settingsOverlay === "sync" ? (
+          <SyncPage onClose={() => setSettingsOverlay(null)} />
         ) : settingsOverlay === "cronJobs" ? (
           <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:"var(--font-sans)"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"1px solid var(--border)",background:"var(--bg-secondary)",flexShrink:0}}>
