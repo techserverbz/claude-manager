@@ -551,7 +551,8 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
         )}
         {convo.last_message_text && (
           <span className="convo-last-msg">
-            {convo.last_message_role === "user" ? "You" : "Christopher"}: {convo.last_message_text.slice(0, 80)}
+            {convo.last_message_role === "user" ? "You" : "Christopher"}: {convo.last_message_text.slice(0, 60)}
+            {convo.last_message_at && <span className="convo-last-msg-time"> · {new Date(convo.last_message_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
           </span>
         )}
         <div className="convo-meta-tags">
@@ -561,7 +562,7 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
           {convo.claude_session_id && <span className="convo-session-id">session: {convo.claude_session_id.slice(0, 8)}</span>}
         </div>
         <div className="convo-meta">
-          <span className="convo-meta-item">{convo.last_message_at ? `last msg ${formatTime(convo.last_message_at)}` : `modified ${formatTime(convo.updated_at)}`}</span>
+          <span className="convo-meta-item">{convo.last_message_at ? `last msg ${new Date(convo.last_message_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : `modified ${formatTime(convo.updated_at)}`}</span>
           <span className="convo-meta-sep" />
           <span className="convo-meta-item">created {formatTime(convo.created_at)}</span>
         </div>
@@ -607,6 +608,20 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
           }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             Sessions
+          </button>
+          <button className="ctx-item" onClick={async () => {
+            setMenuOpen(false);
+            try {
+              const res = await fetch(`/api/conversations/${convo.id}`);
+              const c = await res.json();
+              const text = c.last_message_text || "(no messages yet)";
+              const role = c.last_message_role === "user" ? "You" : "Christopher";
+              const time = c.last_message_at ? new Date(c.last_message_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+              alert(`${role}: ${text}\n\n${time}`);
+            } catch { alert("Could not load last message"); }
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            Last Message
           </button>
           <div className="ctx-divider" />
           <div className="ctx-header">Status</div>

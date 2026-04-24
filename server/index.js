@@ -689,6 +689,31 @@ app.get("/api/conversations", async (req, res) => {
   }
 });
 
+// Backfill last_message for all conversations from JSONL files
+app.post("/api/conversations/backfill-last-message", async (req, res) => {
+  try {
+    const convos = await db.query("SELECT id, agent FROM conversations WHERE last_message_text IS NULL");
+    let filled = 0;
+    for (const c of convos.rows) {
+      try {
+        const msgs = memoryManager.getMessages(c.id, c.agent || "coding");
+        if (msgs && msgs.length > 0) {
+          const last = msgs[msgs.length - 1];
+          const preview = (last.content || "").substring(0, 200);
+          await db.query(
+            `UPDATE conversations SET last_message_text = $1, last_message_role = $2, last_message_at = COALESCE($3::timestamptz, NOW()), updated_at = NOW() WHERE id = $4`,
+            [preview, last.role || "assistant", last.created_at || null, c.id]
+          );
+          filled++;
+        }
+      } catch {}
+    }
+    res.json({ ok: true, filled, total: convos.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Search conversations by title and message content
 app.get("/api/conversations/search", async (req, res) => {
   try {
@@ -2104,8 +2129,18 @@ io.on("connection", (socket) => {
     }
   });
 
+  const ptyInputBuffers = {};
   socket.on("pty:input", ({ conversationId, data }) => {
     terminalManager.writeToTerminal(conversationId, data);
+    if (conversationId && data) {
+      if (!ptyInputBuffers[conversationId]) ptyInputBuffers[conversationId] = "";
+      ptyInputBuffers[conversationId] += data;
+      if (data.includes("\r") || data.includes("\n")) {
+        const msg = ptyInputBuffers[conversationId].replace(/[\r\n]+/g, "").trim();
+        if (msg.length > 1) updateLastMessage(conversationId, "user", msg);
+        ptyInputBuffers[conversationId] = "";
+      }
+    }
   });
 
   socket.on("pty:resize", ({ conversationId, cols, rows }) => {
@@ -2271,6 +2306,7 @@ io.on("connection", (socket) => {
   socket.on("terminal:input", ({ text, conversationId }) => {
     if (!text || !conversationId) return;
     claudeManager.writeRawStdin(conversationId, text);
+    if (text.trim().length > 1) updateLastMessage(conversationId, "user", text.trim());
   });
 
   socket.on("chat:stop", (data) => {
