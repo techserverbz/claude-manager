@@ -17,12 +17,20 @@ export class SessionReader {
       return fs.statSync(path.join(this.projectsDir, d)).isDirectory();
     });
 
+    let bestPath = null;
+    let bestSize = -1;
     for (const dir of projectDirs) {
       const jsonlPath = path.join(this.projectsDir, dir, `${sessionId}.jsonl`);
-      if (fs.existsSync(jsonlPath)) return jsonlPath;
+      if (fs.existsSync(jsonlPath)) {
+        const size = fs.statSync(jsonlPath).size;
+        if (size > bestSize) {
+          bestSize = size;
+          bestPath = jsonlPath;
+        }
+      }
     }
 
-    return null;
+    return bestPath;
   }
 
   // Read and parse a session JSONL file, returning all events
