@@ -549,6 +549,11 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
         {convo.status_summary && convo.status === "waiting_for_user" && (
           <span className="convo-summary">{convo.status_summary}</span>
         )}
+        {convo.last_message_text && (
+          <span className="convo-last-msg">
+            {convo.last_message_role === "user" ? "You" : "Christopher"}: {convo.last_message_text.slice(0, 80)}
+          </span>
+        )}
         <div className="convo-meta-tags">
           {convoMode && <span className={`convo-mode-badge ${convoMode.startsWith("terminal") ? "terminal" : "process"}`}>
             {convoMode === "terminal-persistent" ? "$_ Terminal" : convoMode === "terminal-oneshot" ? ">_ Terminal 1x" : convoMode === "process-persistent" ? "[] Process" : "> Process 1x"}
@@ -556,7 +561,7 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
           {convo.claude_session_id && <span className="convo-session-id">session: {convo.claude_session_id.slice(0, 8)}</span>}
         </div>
         <div className="convo-meta">
-          <span className="convo-meta-item">modified {formatTime(convo.updated_at)}</span>
+          <span className="convo-meta-item">{convo.last_message_at ? `last msg ${formatTime(convo.last_message_at)}` : `modified ${formatTime(convo.updated_at)}`}</span>
           <span className="convo-meta-sep" />
           <span className="convo-meta-item">created {formatTime(convo.created_at)}</span>
         </div>

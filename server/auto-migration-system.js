@@ -18,6 +18,9 @@ export class AutoMigrationSystem {
         status_updated_at: { type: 'TIMESTAMPTZ', default: 'NOW()' },
         agent: { type: 'TEXT', default: "'coding'" },
         metadata: { type: 'JSONB', default: "'{}'::jsonb" },
+        last_message_text: { type: 'TEXT', nullable: true },
+        last_message_role: { type: 'TEXT', nullable: true },
+        last_message_at: { type: 'TIMESTAMPTZ', nullable: true },
         created_at: { type: 'TIMESTAMPTZ', default: 'NOW()' },
         updated_at: { type: 'TIMESTAMPTZ', default: 'NOW()' }
       },
