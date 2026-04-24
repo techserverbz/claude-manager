@@ -90,10 +90,12 @@ export default function CliPanel({ events, streamingText, isThinking, onSendMess
     // Always scroll on initial load (0 → N), otherwise respect stickToBottom
     if ((wasEmpty && events.length > 0) || stickToBottom.current) {
       if (scrollRef.current) {
-        // Use setTimeout to ensure DOM has rendered the new messages
-        setTimeout(() => {
-          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }, 50);
+        // Multiple attempts — large conversations take longer to render
+        for (const delay of [50, 200, 500]) {
+          setTimeout(() => {
+            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          }, delay);
+        }
       }
     }
   }, [events.length, streamingText]);
