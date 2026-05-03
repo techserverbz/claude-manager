@@ -27,6 +27,15 @@ const REPOS = {
     description: "Team wiki with skills/candidate tiers",
     // Clone path is flexible — stored per-service in brain registry
   },
+  "excalidraw-canvas": {
+    owner: "techserverbz",
+    repo: "excalidraw-canvas",
+    label: "Excalidraw Canvas",
+    description: "Infinite canvas with MCP integration for AI-powered diagramming",
+    clonePath: () => path.join(process.env.USERPROFILE || process.env.HOME, "Desktop", "Github", "excalidraw-canvas"),
+    defaultPort: 4000,
+    defaultCanvasDir: () => path.join(process.env.USERPROFILE || process.env.HOME, "Desktop", "Github", "Canvas"),
+  },
 };
 
 export class SyncManager {
@@ -49,6 +58,9 @@ export class SyncManager {
 
     // Karpathy Services — check sync logs from registered service brains
     results["karpathy-services"] = await this._getKarpathyServicesStatus();
+
+    // Excalidraw Canvas
+    results["excalidraw-canvas"] = await this._getExcalidrawCanvasStatus();
 
     return results;
   }
@@ -227,6 +239,58 @@ export class SyncManager {
     return { ...info, installed: services.length > 0, services };
   }
 
+  async _getExcalidrawCanvasStatus() {
+    const info = { ...REPOS["excalidraw-canvas"], target: "excalidraw-canvas" };
+    const clonePath = REPOS["excalidraw-canvas"].clonePath();
+
+    if (!fs.existsSync(path.join(clonePath, "package.json"))) {
+      return { ...info, installed: false, clonePath };
+    }
+
+    try {
+      const hasGit = fs.existsSync(path.join(clonePath, ".git"));
+      let commit, commitDate, commitMsg, remote;
+      if (hasGit) {
+        commit = execSync("git rev-parse HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
+        commitDate = execSync("git log -1 --format=%cI", { cwd: clonePath, encoding: "utf-8" }).trim();
+        commitMsg = execSync("git log -1 --format=%s", { cwd: clonePath, encoding: "utf-8" }).trim();
+        try { remote = execSync("git config --get remote.origin.url", { cwd: clonePath, encoding: "utf-8" }).trim(); } catch {}
+      }
+
+      // Read .env for config
+      let port = REPOS["excalidraw-canvas"].defaultPort;
+      let canvasDir = "";
+      const envPath = path.join(clonePath, ".env");
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, "utf-8");
+        const portMatch = envContent.match(/^PORT=(\d+)/m);
+        const dirMatch = envContent.match(/^CANVAS_DIR=(.+)/m);
+        if (portMatch) port = parseInt(portMatch[1]);
+        if (dirMatch) canvasDir = dirMatch[1].trim();
+      }
+
+      // Check if node_modules exists
+      const hasNodeModules = fs.existsSync(path.join(clonePath, "node_modules"));
+
+      return {
+        ...info,
+        installed: true,
+        commit: commit ? commit.slice(0, 7) : null,
+        commitFull: commit || null,
+        commitDate: commitDate || null,
+        commitMessage: commitMsg || null,
+        remote: remote || null,
+        path: clonePath,
+        port,
+        canvasDir,
+        hasNodeModules,
+        hasGit,
+      };
+    } catch (err) {
+      return { ...info, installed: true, error: err.message, path: clonePath };
+    }
+  }
+
   // --- Check: compare local version with GitHub latest ---
 
   async checkForUpdates(target, localCommitOverride = null) {
@@ -291,6 +355,8 @@ export class SyncManager {
         return this._installOrUpdateKarpathyPersonal();
       case "karpathy-services":
         return this._installOrUpdateKarpathyServices(options);
+      case "excalidraw-canvas":
+        return this._installOrUpdateExcalidrawCanvas(options);
       default:
         throw new Error(`Unknown target: ${target}`);
     }
@@ -432,6 +498,79 @@ export class SyncManager {
       }
 
       return result;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  async _installOrUpdateExcalidrawCanvas(options = {}) {
+    const repoInfo = REPOS["excalidraw-canvas"];
+    const clonePath = options.clonePath || repoInfo.clonePath();
+    const repoUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
+    const canvasDir = options.canvasDir || repoInfo.defaultCanvasDir();
+    const port = options.port || repoInfo.defaultPort;
+
+    try {
+      const isUpdate = fs.existsSync(path.join(clonePath, ".git"));
+
+      if (isUpdate) {
+        // Pull latest
+        const pullOutput = execSync("git pull origin master", {
+          cwd: clonePath, encoding: "utf-8", timeout: 30000,
+        }).trim();
+
+        // Reinstall deps if package.json changed
+        let npmOutput = "";
+        if (pullOutput.includes("package.json") || pullOutput.includes("package-lock.json")) {
+          npmOutput = execSync("npm install", {
+            cwd: clonePath, encoding: "utf-8", timeout: 120000,
+          }).trim();
+        }
+
+        const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
+
+        return {
+          success: true,
+          action: "updated",
+          commit,
+          clonePath,
+          pullOutput: pullOutput.slice(0, 500),
+          npmOutput: npmOutput.slice(0, 300),
+        };
+      } else {
+        // Fresh install: clone
+        fs.mkdirSync(path.dirname(clonePath), { recursive: true });
+        const cloneOutput = execSync(
+          `git clone "${repoUrl}" "${path.basename(clonePath)}"`,
+          { cwd: path.dirname(clonePath), encoding: "utf-8", timeout: 60000 }
+        ).trim();
+
+        // Write .env
+        fs.mkdirSync(canvasDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(clonePath, ".env"),
+          `# Excalidraw Canvas — Generated by Claude Manager\nCANVAS_DIR=${canvasDir}\nPORT=${port}\n`
+        );
+
+        // npm install
+        const npmOutput = execSync("npm install", {
+          cwd: clonePath, encoding: "utf-8", timeout: 120000,
+        }).trim();
+
+        const commit = execSync("git rev-parse --short HEAD", { cwd: clonePath, encoding: "utf-8" }).trim();
+
+        return {
+          success: true,
+          action: "installed",
+          commit,
+          clonePath,
+          canvasDir,
+          port,
+          cloneOutput: cloneOutput.slice(0, 300),
+          npmOutput: npmOutput.slice(-300),
+          note: `Canvas files at ${canvasDir}. Start with: cd "${clonePath}" && npm run dev`,
+        };
+      }
     } catch (err) {
       return { success: false, error: err.message };
     }

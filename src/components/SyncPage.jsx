@@ -4,6 +4,7 @@ const TARGETS = [
   { key: "claude-manager", icon: "C", accent: "--acid" },
   { key: "karpathy-personal", icon: "P", accent: "--acid" },
   { key: "karpathy-services", icon: "S", accent: "--amber" },
+  { key: "excalidraw-canvas", icon: "E", accent: "--flame" },
 ];
 
 export default function SyncPage({ onClose }) {
@@ -145,6 +146,24 @@ export default function SyncPage({ onClose }) {
               <div className="sync-row">
                 <span className="sync-label">Categories</span>
                 <span className="sync-mono">{s.pageCategories}</span>
+              </div>
+            )}
+            {s.port && (
+              <div className="sync-row">
+                <span className="sync-label">Port</span>
+                <span className="sync-mono">{s.port}</span>
+              </div>
+            )}
+            {s.canvasDir && (
+              <div className="sync-row">
+                <span className="sync-label">Canvas</span>
+                <span className="sync-mono sync-path">{s.canvasDir}</span>
+              </div>
+            )}
+            {s.hasNodeModules === false && s.installed && (
+              <div className="sync-row">
+                <span className="sync-label">Deps</span>
+                <span className="sync-mono" style={{color:"var(--amber)"}}>node_modules missing — click Update</span>
               </div>
             )}
           </div>
