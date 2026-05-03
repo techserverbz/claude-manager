@@ -21,6 +21,7 @@ export class AutoMigrationSystem {
         last_message_text: { type: 'TEXT', nullable: true },
         last_message_role: { type: 'TEXT', nullable: true },
         last_message_at: { type: 'TIMESTAMPTZ', nullable: true },
+        last_message_session_id: { type: 'TEXT', nullable: true },
         created_at: { type: 'TIMESTAMPTZ', default: 'NOW()' },
         updated_at: { type: 'TIMESTAMPTZ', default: 'NOW()' }
       },

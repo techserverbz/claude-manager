@@ -57,6 +57,7 @@ export default function App() {
   const [currentModel, setCurrentModel] = useState("claude-opus-4-6");
   const [agentMode, setAgentMode] = useState("");
   const [appName, setAppName] = useState("AI Assistant");
+  const [serverInfo, setServerInfo] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [volume, setVolume] = useState(1);
   const [showVolume, setShowVolume] = useState(false);
@@ -355,7 +356,7 @@ export default function App() {
     fetchConversations();
     fetchActiveSessions();
     fetchCurrentModel();
-    fetch("/api/app-name").then(r => r.json()).then(d => { if (d.name) { setAppName(d.name); document.title = `${d.name} - AI Assistant`; } }).catch(() => {});
+    fetch("/api/app-name").then(r => r.json()).then(d => { if (d.name) { setAppName(d.name); document.title = `${d.name} - AI Assistant`; } if (d.ip) setServerInfo({ ip: d.ip, port: d.port, hostname: d.hostname }); }).catch(() => {});
     fetchLocalSessions();
     const savedConvoId = sessionStorage.getItem("christopher_convoId");
     if (savedConvoId && !savedConvoId.startsWith("local-")) {
@@ -869,6 +870,7 @@ export default function App() {
       {sidebarOpen && (
         <Sidebar
           appName={appName}
+          serverInfo={serverInfo}
           conversations={conversations}
           currentConvoId={currentConvoId}
           queueCount={queueCount}

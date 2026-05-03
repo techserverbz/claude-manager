@@ -20,6 +20,7 @@ const MODE_OPTIONS = [
 
 export default function Sidebar({
   appName,
+  serverInfo,
   conversations,
   currentConvoId,
   queueCount,
@@ -195,7 +196,10 @@ export default function Sidebar({
     )}
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h3>{appName || "AI Assistant"}</h3>
+        <div className="sidebar-header-info">
+          <h3>{appName || "AI Assistant"}</h3>
+          {serverInfo && <span className="sidebar-server-tag">{serverInfo.ip}:{serverInfo.port}</span>}
+        </div>
         <button className="btn-icon" onClick={onClose} title="Close sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -617,7 +621,12 @@ function ConvoItem({ convo, isActive, onClick, onDoubleClick, onDelete, onChange
               const text = c.last_message_text || "(no messages yet)";
               const role = c.last_message_role === "user" ? "You" : "Christopher";
               const time = c.last_message_at ? new Date(c.last_message_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
-              alert(`${role}: ${text}\n\n${time}`);
+              const sid = c.last_message_session_id || c.claude_session_id || "(no session)";
+              const msg = `${role}: ${text}\n\nTime: ${time}\nSession: ${sid}`;
+              const doCopy = confirm(`${msg}\n\n— Click OK to copy Session ID —`);
+              if (doCopy && sid !== "(no session)") {
+                navigator.clipboard.writeText(sid).then(() => {}).catch(() => {});
+              }
             } catch { alert("Could not load last message"); }
           }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>

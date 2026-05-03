@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { execSync } from "child_process";
 import dotenv from "dotenv";
 import { ClaudeManager } from "./claude-manager.js";
@@ -79,12 +80,19 @@ const sessionReader = new SessionReader();
 app.use("/api/tasks", createTaskRouter(db, io, memoryManager));
 app.use("/api/crm", createCrmProxyRouter());
 
-async function updateLastMessage(conversationId, role, text) {
+async function updateLastMessage(conversationId, role, text, sessionId) {
   const preview = (text || '').substring(0, 200);
-  await db.query(
-    `UPDATE conversations SET last_message_text = $1, last_message_role = $2, last_message_at = NOW(), updated_at = NOW() WHERE id = $3`,
-    [preview, role, conversationId]
-  ).catch(() => {});
+  if (sessionId) {
+    await db.query(
+      `UPDATE conversations SET last_message_text = $1, last_message_role = $2, last_message_at = NOW(), last_message_session_id = $4, updated_at = NOW() WHERE id = $3`,
+      [preview, role, conversationId, sessionId]
+    ).catch(() => {});
+  } else {
+    await db.query(
+      `UPDATE conversations SET last_message_text = $1, last_message_role = $2, last_message_at = NOW(), updated_at = NOW() WHERE id = $3`,
+      [preview, role, conversationId]
+    ).catch(() => {});
+  }
 }
 
 // Christopher config — brain-aware (agents are chat-only now)
@@ -339,7 +347,15 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/app-name", (req, res) => {
-  res.json({ name: APP_NAME });
+  const interfaces = os.networkInterfaces();
+  let ip = "127.0.0.1";
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) { ip = iface.address; break; }
+    }
+    if (ip !== "127.0.0.1") break;
+  }
+  res.json({ name: APP_NAME, port: APP_PORT, ip, hostname: os.hostname() });
 });
 
 // Open a path in Windows Explorer
@@ -506,10 +522,10 @@ app.post("/api/sessions/:sessionId/import", async (req, res) => {
         for (let i = events.length - 1; i >= 0; i--) {
           const e = events[i];
           if (e.type === "assistant" && e.message) {
-            await updateLastMessage(convo.id, "assistant", e.message);
+            await updateLastMessage(convo.id, "assistant", e.message, sessionId);
             break;
           } else if (e.type === "user" && e.message) {
-            await updateLastMessage(convo.id, "user", e.message);
+            await updateLastMessage(convo.id, "user", e.message, sessionId);
             break;
           }
         }
@@ -638,7 +654,7 @@ app.post("/api/conversations/:id/start-session", async (req, res) => {
       // onComplete
       async (fullResponse, sessionId) => {
         memoryManager.appendMessage(conversationId, "assistant", fullResponse);
-        updateLastMessage(conversationId, "assistant", fullResponse);
+        updateLastMessage(conversationId, "assistant", fullResponse, sessionId);
         await db.query(
           "UPDATE conversations SET claude_session_id = $1, status = 'active', updated_at = NOW() WHERE id = $2",
           [sessionId, conversationId]
@@ -1140,7 +1156,7 @@ app.post("/api/conversations/:id/dispatch", async (req, res) => {
       (chunk) => io.emit("chat:chunk", { text: chunk, conversationId }),
       async (fullResponse, sessionId) => {
         memoryManager.appendMessage(conversationId, "assistant", fullResponse);
-        updateLastMessage(conversationId, "assistant", fullResponse);
+        updateLastMessage(conversationId, "assistant", fullResponse, sessionId);
         const shouldUpdateSession = !originalSessionId || sessionId === originalSessionId;
         if (shouldUpdateSession) {
           await db.query(
@@ -1915,7 +1931,7 @@ async function processMessage(socket, job) {
     };
     const onComplete = async (fullResponse, sessionId) => {
       memoryManager.appendMessage(convo.id, "assistant", fullResponse);
-      updateLastMessage(convo.id, "assistant", fullResponse);
+      updateLastMessage(convo.id, "assistant", fullResponse, sessionId);
       await db.query(
         "UPDATE conversations SET claude_session_id = $1, updated_at = NOW() WHERE id = $2",
         [sessionId, convo.id]
@@ -2263,7 +2279,7 @@ io.on("connection", (socket) => {
         // onComplete
         async (fullResponse, sessionId) => {
           memoryManager.appendMessage(conversationId, "assistant", fullResponse);
-          updateLastMessage(conversationId, "assistant", fullResponse);
+          updateLastMessage(conversationId, "assistant", fullResponse, sessionId);
           await db.query(
             "UPDATE conversations SET claude_session_id = $1, status = 'active', updated_at = NOW() WHERE id = $2",
             [sessionId, conversationId]
